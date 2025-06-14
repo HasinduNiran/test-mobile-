@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
 const profileRoutes = require('./routes/profile');
 const stockRoutes = require('./routes/stock');
+const orderRoutes = require('./routes/orders');
 
 // Load environment variables
 dotenv.config();
@@ -39,6 +40,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/stock', stockRoutes);
+app.use('/api/orders', orderRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

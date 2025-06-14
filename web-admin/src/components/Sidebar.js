@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { Nav } from 'react-bootstrap';
-import { FaBoxes, FaTachometerAlt, FaUserCircle } from 'react-icons/fa';
+import { FaBoxes, FaShoppingCart, FaTachometerAlt, FaUserCircle, FaUsers } from 'react-icons/fa';
 import { NavLink } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
@@ -21,13 +21,28 @@ const Sidebar = () => {
           </NavLink>
         </Nav.Item>
         
-        {userInfo?.role === 'admin' && (
-          <Nav.Item>
-            <NavLink to="/stock" className="sidebar-link">
-              <FaBoxes />
-              Stock Management
-            </NavLink>
-          </Nav.Item>
+        <Nav.Item>
+          <NavLink to="/orders" className="sidebar-link">
+            <FaShoppingCart />
+            Orders
+          </NavLink>
+        </Nav.Item>
+          {userInfo?.role === 'admin' && (
+          <>
+            <Nav.Item>
+              <NavLink to="/stock" className="sidebar-link">
+                <FaBoxes />
+                Stock Management
+              </NavLink>
+            </Nav.Item>
+            
+            <Nav.Item>
+              <NavLink to="/users" className="sidebar-link">
+                <FaUsers />
+                User Management
+              </NavLink>
+            </Nav.Item>
+          </>
         )}
         
         <Nav.Item>

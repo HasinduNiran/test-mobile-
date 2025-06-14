@@ -116,4 +116,68 @@ export const updatePassword = async (currentPassword, newPassword) => {
   }
 };
 
+export const fetchStockItems = async () => {
+  try {
+    const response = await apiClient.get('/stock');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const fetchStockItemById = async (id) => {
+  try {
+    const response = await apiClient.get(`/stock/${id}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const searchStockItems = async (query) => {
+  try {
+    const response = await apiClient.get(`/stock/search?q=${encodeURIComponent(query)}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// POS related APIs
+export const createOrder = async (orderData) => {
+  try {
+    const response = await apiClient.post('/orders', orderData);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getOrders = async () => {
+  try {
+    const response = await apiClient.get('/orders');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getOrderById = async (id) => {
+  try {
+    const response = await apiClient.get(`/orders/${id}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getOrdersSummary = async () => {
+  try {
+    const response = await apiClient.get('/orders/summary/stats');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export default apiClient;

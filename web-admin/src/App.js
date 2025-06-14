@@ -7,9 +7,11 @@ import Dashboard from './pages/Dashboard';
 import EditStock from './pages/EditStock';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
+import OrdersPage from './pages/OrdersPage'; // Import the new OrdersPage
 import Profile from './pages/Profile';
 import Register from './pages/Register';
 import StockManagement from './pages/StockManagement';
+import UserManagement from './pages/UserManagement'; // Import UserManagement
 
 function App() {
   const { userInfo } = useContext(AuthContext);
@@ -60,6 +62,15 @@ function App() {
         <Route path="stock/edit/:id" element={
           <AdminRoute>
             <EditStock />
+          </AdminRoute>
+        } />        <Route path="orders" element={ // Add route for OrdersPage
+          <AdminRoute> {/* Or ProtectedRoute if reps can also see it */}
+            <OrdersPage />
+          </AdminRoute>
+        } />
+        <Route path="users" element={ // Add route for UserManagement
+          <AdminRoute>
+            <UserManagement />
           </AdminRoute>
         } />
       </Route>

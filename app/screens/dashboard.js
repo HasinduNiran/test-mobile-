@@ -2,21 +2,22 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import moment from 'moment';
 import { useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { AuthContext } from '../../context/AuthContext';
-import { fetchDashboardData } from '../../utils/api';
+import { fetchDashboardData, fetchStockItems, getOrdersSummary } from '../../utils/api';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { userInfo, logout } = useContext(AuthContext);
-  const [dashboardData, setDashboardData] = useState(null);
+  const { userInfo, logout } = useContext(AuthContext);  const [dashboardData, setDashboardData] = useState(null);
+  const [stockItems, setStockItems] = useState([]);
+  const [stockCount, setStockCount] = useState(0);
+  const [salesData, setSalesData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [currentTime, setCurrentTime] = useState('');
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -24,6 +25,19 @@ export default function DashboardScreen() {
       const data = await fetchDashboardData();
       setDashboardData(data);
       setCurrentTime(data.currentTime);
+      
+      // Fetch stock items
+      const items = await fetchStockItems();
+      setStockItems(items);
+      setStockCount(items.length || 0);
+      
+      // Fetch sales summary for reps
+      try {
+        const salesSummary = await getOrdersSummary();
+        setSalesData(salesSummary);
+      } catch (err) {
+        console.log('Sales data only available for admins');
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setError('Failed to load dashboard data. Please try again.');
@@ -57,17 +71,39 @@ export default function DashboardScreen() {
       </ThemedView>
     );
   }
-
   const renderTiles = () => {
-    if (!dashboardData || !dashboardData.tiles || !Array.isArray(dashboardData.tiles)) {
-      return null;
-    }
+    // Custom tiles for stock and POS
+    const customTiles = [
+      {
+        id: 'stock',
+        title: 'Inventory',
+        count: stockCount,
+        color: '#4CAF50',
+        icon: 'cubes',
+        onPress: () => router.push('/inventory')
+      },
+      {
+        id: 'pos',
+        title: 'POS System',
+        data: 'Point of Sale',
+        color: '#FF9800',
+        icon: 'shopping-cart',
+        onPress: () => router.push('/pos')
+      }
+    ];
     
-    return dashboardData.tiles.map((tile) => (
+    // Render both custom tiles and existing dashboard tiles
+    const allTiles = [
+      ...customTiles,
+      ...(dashboardData?.tiles?.filter(t => t.id !== 'stock' && t.id !== 'pos') || [])
+    ];
+    
+    return allTiles.map((tile) => (
       <TouchableOpacity
         key={tile.id.toString()}
         style={styles.tile}
         activeOpacity={0.8}
+        onPress={tile.onPress}
       >
         <View style={[styles.tileIconContainer, { backgroundColor: tile.color + '20' }]}>
           <FontAwesome name={tile.icon} size={28} color={tile.color} />
@@ -83,6 +119,100 @@ export default function DashboardScreen() {
         </View>
       </TouchableOpacity>
     ));
+  };
+
+  // Render stock item card
+  const renderStockItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.stockItemCard}
+      onPress={() => router.push('/inventory')}
+    >
+      <View style={styles.stockImageContainer}>
+        {item.imageUrl ? (
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.stockImage}
+            resizeMode="cover"
+            defaultSource={require('../../assets/images/icon.png')}
+          />
+        ) : (
+          <View style={styles.stockPlaceholder}>
+            <FontAwesome name="cube" size={24} color="#A1CEDC" />
+          </View>
+        )}
+      </View>
+      <View style={styles.stockItemContent}>
+        <ThemedText style={styles.stockItemName} numberOfLines={1}>
+          {item.name}
+        </ThemedText>
+        <ThemedText style={styles.stockItemCategory} numberOfLines={1}>
+          {item.category}
+        </ThemedText>
+        <View style={styles.stockItemFooter}>
+          <ThemedText style={styles.stockItemPrice}>${item.price.toFixed(2)}</ThemedText>
+          <View style={styles.stockQuantityContainer}>
+            <ThemedText style={[
+              styles.stockQuantity,
+              item.quantity < 10 ? styles.lowQuantity : null
+            ]}>{item.quantity}</ThemedText>
+            <ThemedText style={styles.inStockText}>in stock</ThemedText>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+  
+  // Render stock section
+  const renderStockSection = () => {
+    if (!stockItems || stockItems.length === 0) {
+      return null;
+    }
+    
+    return (
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <ThemedText style={styles.sectionTitle}>Latest Stock Items</ThemedText>
+          <TouchableOpacity onPress={() => router.push('/inventory')}>
+            <ThemedText style={styles.viewAllText}>View All</ThemedText>
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          data={stockItems.slice(0, 5)} // Only show 5 most recent items
+          renderItem={renderStockItem}
+          keyExtractor={(item) => item._id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.stockList}
+          contentContainerStyle={styles.stockListContent}
+        />
+      </View>
+    );
+  };
+
+  // Render sales summary cards
+  const renderSalesSummary = () => {
+    if (!salesData || salesData.length === 0) {
+      return null;
+    }
+    
+    return (
+      <View style={styles.salesSummaryContainer}>
+        {salesData.map((item, index) => (
+          <View key={index} style={styles.salesCard}>
+            <View style={styles.salesIconContainer}>
+              <FontAwesome name="dollar" size={18} color="#4CAF50" />
+            </View>
+            <View style={styles.salesContent}>
+              <ThemedText style={styles.salesLabel}>{item.label}</ThemedText>
+              <ThemedText style={styles.salesValue}>
+                ${item.value.toFixed(2)}
+              </ThemedText>
+              <ThemedText style={styles.salesSubtext}>{item.subtext}</ThemedText>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -158,6 +288,8 @@ export default function DashboardScreen() {
               {renderTiles()}
             </View>
 
+            {renderStockSection()}
+
             <View style={styles.activitySection}>
               <ThemedText style={styles.sectionTitle}>Recent Activity</ThemedText>
               <View style={styles.activityCard}>
@@ -179,6 +311,11 @@ export default function DashboardScreen() {
                   <ThemedText style={styles.activityTime}>Yesterday</ThemedText>
                 </View>
               </View>
+            </View>
+
+            <View style={styles.salesSection}>
+              <ThemedText style={styles.sectionTitle}>Sales Summary</ThemedText>
+              {renderSalesSummary()}
             </View>
           </View>
         )}
@@ -431,5 +568,157 @@ const styles = StyleSheet.create({
   activityDivider: {
     height: 1,
     backgroundColor: '#eeeeee',
+  },
+  sectionContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#2196F3',
+    fontWeight: '500',
+  },
+  stockList: {
+    marginTop: 10,
+  },
+  stockListContent: {
+    paddingVertical: 10,
+  },
+  stockItemCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 12,
+    marginRight: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    width: 120,
+  },
+  stockImageContainer: {
+    width: '100%',
+    height: 80,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stockImage: {
+    width: '100%',
+    height: '100%',
+  },
+  stockPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e0f7fa',
+  },
+  stockItemContent: {
+    flex: 1,
+  },
+  stockItemName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 4,
+  },
+  stockItemCategory: {
+    fontSize: 12,
+    color: '#757575',
+    marginBottom: 8,
+  },
+  stockItemFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  stockItemPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  stockQuantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stockQuantity: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginRight: 4,
+  },
+  lowQuantity: {
+    color: '#d32f2f',
+    fontWeight: 'bold',
+  },
+  inStockText: {
+    fontSize: 12,
+    color: '#9e9e9e',
+  },
+  salesSection: {
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  salesSummaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  salesCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  salesIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  salesContent: {
+    flex: 1,
+  },
+  salesLabel: {
+    fontSize: 12,
+    color: '#757575',
+  },
+  salesValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 2,
+  },
+  salesSubtext: {
+    fontSize: 11,
+    color: '#9e9e9e',
+    marginTop: 2,
   },
 });

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 // Sample dashboard data with 5 tiles
 router.get('/', auth, async (req, res) => {
@@ -34,12 +34,11 @@ router.get('/', auth, async (req, res) => {
           count: 8,
           icon: "users",
           color: "#2196F3"
-        },
-        {
+        },        {
           id: 4,
           title: "Performance",
           data: "85%",
-          icon: "chart-bar",
+          icon: "bar-chart",
           color: "#9C27B0"
         },
         {

@@ -32,31 +32,32 @@ const Dashboard = () => {
     totalStock: 0,
     lowStock: 0,
     categories: 0,
-    totalValue: 0
+    totalValue: 0,
   });
   const [stockData, setStockData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
+        setError('');
+
         // Fetch all stock items
-        const response = await axios.get('/api/stock');
-        const stockItems = response.data;
+        const stockResponse = await axios.get('/api/stock');
+        const stockItems = stockResponse.data;
         
-        // Calculate statistics
         const totalValue = stockItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const lowStockItems = stockItems.filter(item => item.quantity < 10);
         const categories = [...new Set(stockItems.map(item => item.category))];
         
         setStockData(stockItems);
+
         setStats({
           totalStock: stockItems.length,
           lowStock: lowStockItems.length,
           categories: categories.length,
-          totalValue: totalValue.toFixed(2)
+          totalValue: totalValue.toFixed(2),
         });
         
       } catch (err) {
@@ -65,12 +66,10 @@ const Dashboard = () => {
       } finally {
         setLoading(false);
       }
-    };
+    };    fetchDashboardData();
+  }, [userInfo]);
 
-    fetchDashboardData();
-  }, []);
-
-  // Prepare chart data
+  // Prepare chart data for stock
   const chartData = {
     labels: stockData.slice(0, 5).map(item => item.name),
     datasets: [
@@ -148,13 +147,12 @@ const Dashboard = () => {
                 </Card.Body>
               </Card>
             </Col>
-            
-            <Col md={3}>
+              <Col md={3}>
               <Card className="stats-card" style={{borderLeftColor: '#2196f3'}}>
                 <Card.Body>
                   <div className="d-flex justify-content-between">
                     <div>
-                      <h6 className="text-muted">Total Value</h6>
+                      <h6 className="text-muted">Total Value (Stock)</h6>
                       <h3>${stats.totalValue}</h3>
                     </div>
                     <div className="stats-icon text-primary">
@@ -163,8 +161,7 @@ const Dashboard = () => {
                   </div>
                 </Card.Body>
               </Card>
-            </Col>
-          </Row>
+            </Col>          </Row>
 
           {/* Stock Chart */}
           <Row className="mb-4">
@@ -198,12 +195,13 @@ const Dashboard = () => {
             </Col>
           </Row>
           
-          {/* Recent Stock Items */}
+          {/* The original "Recent Stock Items" section might be re-added here if needed for all users */}
+          {/* For example, to show top 5 stock items: */}
           <Row>
             <Col>
               <Card>
                 <Card.Header>
-                  <h5 className="mb-0">Recent Stock Items</h5>
+                  <h5 className="mb-0">Top Stock Items (by Quantity)</h5>
                 </Card.Header>
                 <Card.Body>
                   <div className="table-responsive">

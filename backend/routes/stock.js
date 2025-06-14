@@ -1,6 +1,6 @@
 const express = require('express');
 const Stock = require('../models/Stock');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const router = express.Router();
 
 // Middleware to check if user is admin
@@ -22,6 +22,31 @@ router.get('/', auth, async (req, res) => {
     res.json(stocks);
   } catch (err) {
     console.error('Error fetching stock:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Search stock items by name, barcode, or category
+router.get('/search', auth, async (req, res) => {
+  try {
+    const query = req.query.q;
+    if (!query) {
+      return res.status(400).json({ message: 'Search query is required' });
+    }
+    
+    // Create a regex search for name, description, category, or exact barcode match
+    const stocks = await Stock.find({
+      $or: [
+        { name: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } },
+        { category: { $regex: query, $options: 'i' } },
+        { barcode: query } // Exact match for barcode
+      ]
+    }).sort({ name: 1 });
+    
+    res.json(stocks);
+  } catch (err) {
+    console.error('Error searching stock items:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
