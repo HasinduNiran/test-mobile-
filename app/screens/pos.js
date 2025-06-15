@@ -38,10 +38,11 @@ export default function PosScreen() {
   const [visiblePanel, setVisiblePanel] = useState('scanner'); // 'scanner', 'cart', 'receipt'
   const [receiptData, setReceiptData] = useState(null);
   const searchInputRef = useRef(null);
-  const [lastScannedCode, setLastScannedCode] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [lastScannedCode, setLastScannedCode] = useState('');  const [selectedProduct, setSelectedProduct] = useState(null);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [isFreeItem, setIsFreeItem] = useState(false);
+  const [customPrice, setCustomPrice] = useState('');
+  const [customQuantity, setCustomQuantity] = useState('1');
   const [orderPlacedMessage, setOrderPlacedMessage] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   
@@ -85,47 +86,70 @@ export default function PosScreen() {
     } finally {
       setIsSearching(false);
     }
-  };
-  // Select product from search results
+  };  // Select product from search results
   const selectProduct = (item) => {
     setSelectedProduct(item);
     setDiscountPercent(0);
     setIsFreeItem(false);
+    setCustomPrice(item.price.toString());
+    setCustomQuantity('1');
   };
-  
-  // Add item to cart
+    // Add item to cart
   const addToCart = () => {
     if (!selectedProduct) return;
     
     const item = selectedProduct;
+    const finalPrice = isFreeItem ? 0 : (parseFloat(customPrice) || item.price);
+    const quantity = parseInt(customQuantity) || 1;
     
-    // Create item with discount and quantity info
+    // Validate inputs
+    if (quantity <= 0) {
+      Alert.alert("Invalid Quantity", "Please enter a valid quantity greater than 0.");
+      return;
+    }
+    
+    if (!isFreeItem && (finalPrice < 0 || isNaN(finalPrice))) {
+      Alert.alert("Invalid Price", "Please enter a valid price.");
+      return;
+    }
+
+    // Create item with custom price, discount and quantity info
     const cartItem = {
       ...item,
-      quantity: 1,
+      price: finalPrice,
+      originalPrice: item.price,
+      quantity: quantity,
       discountPercent: isFreeItem ? 100 : discountPercent,
       isFreeItem: isFreeItem
     };
-    
-    setCartItems(prevItems => {
-      // Check if item is already in cart
-      const existingItem = prevItems.find(i => i._id === item._id);
+      setCartItems(prevItems => {
+      // Check if item is already in cart with same price
+      const existingItem = prevItems.find(i => 
+        i._id === item._id && 
+        i.price === finalPrice && 
+        i.discountPercent === cartItem.discountPercent
+      );
       
       if (existingItem) {
         // Increment quantity
         return prevItems.map(i => 
-          i._id === item._id ? { ...i, quantity: i.quantity + 1 } : i
+          i._id === item._id && i.price === finalPrice && i.discountPercent === cartItem.discountPercent
+            ? { ...i, quantity: i.quantity + quantity } 
+            : i
         );
       } else {
         // Add new item
         return [...prevItems, cartItem];
       }
     });
-    
-    // Clear search and selection after adding
+      // Clear search and selection after adding
     setSearchText('');
     setSearchResults([]);
     setSelectedProduct(null);
+    setCustomPrice('');
+    setCustomQuantity('1');
+    setDiscountPercent(0);
+    setIsFreeItem(false);
     
     // Save as last scanned if it came from barcode scan
     if (searchText === item.barcode) {
@@ -269,7 +293,7 @@ export default function PosScreen() {
           <ThemedText style={styles.searchItemCategory}>{item.category}</ThemedText>
           {item.barcode && (            <View style={styles.searchItemBarcode}>
               <Text>
-                <FontAwesome name="barcode" size={12} color="#666" />
+                <FontAwesome name="barcode" size={12} color="#333" />
               </Text>
               <ThemedText style={styles.searchItemBarcodeText}>{item.barcode}</ThemedText>
             </View>
@@ -284,12 +308,18 @@ export default function PosScreen() {
   );
     // Cart item component
   const renderCartItem = ({ item, index }) => (
-    <View style={styles.cartItem}>
-      <View style={styles.cartItemInfo}>
+    <View style={styles.cartItem}>      <View style={styles.cartItemInfo}>
         <ThemedText style={styles.cartItemName}>{item.name}</ThemedText>
         <View style={styles.cartItemPriceRow}>
-          <ThemedText style={styles.cartItemPrice}>Rs {item.price.toFixed(2)} each</ThemedText>
-          {item.discountPercent > 0 && (
+          <ThemedText style={styles.cartItemPrice}>
+            Rs {item.price.toFixed(2)} each
+            {item.originalPrice && item.originalPrice !== item.price && (
+              <ThemedText style={styles.originalPriceText}>
+                {' '}(was Rs {item.originalPrice.toFixed(2)})
+              </ThemedText>
+            )}
+          </ThemedText>
+          {item.discountPercent > 0 && !item.isFreeItem && (
             <ThemedText style={styles.discountText}>
               {item.discountPercent}% off
             </ThemedText>
@@ -533,11 +563,11 @@ export default function PosScreen() {
                 onPress={() => setSearchText('')}
               >
                 <Text>
-                  <FontAwesome name="times-circle" size={18} color="#666" />
+                  <FontAwesome name="times-circle" size={18} color="#333" />
                 </Text>
               </TouchableOpacity>            ) : (
               <Text>
-                <FontAwesome name="barcode" size={18} color="#666" />
+                <FontAwesome name="barcode" size={18} color="#333" />
               </Text>
             )}
           </View>
@@ -551,16 +581,43 @@ export default function PosScreen() {
               style={styles.searchResults}
             />
           )}
-          
-          {/* Product Selection Options */}
+            {/* Product Selection Options */}
           {selectedProduct && (
             <View style={styles.productOptionsContainer}>
               <View style={styles.selectedProductInfo}>
                 <ThemedText style={styles.selectedProductName}>{selectedProduct.name}</ThemedText>
-                <ThemedText style={styles.selectedProductPrice}>Rs {selectedProduct.price.toFixed(2)}</ThemedText>
+                <ThemedText style={styles.selectedProductPrice}>Original Price: Rs {selectedProduct.price.toFixed(2)}</ThemedText>
+                <ThemedText style={styles.selectedProductStock}>Stock: {selectedProduct.quantity}</ThemedText>
               </View>
               
               <View style={styles.optionsContainer}>
+                {/* Price Input */}
+                <View style={styles.inputContainer}>
+                  <ThemedText style={styles.inputLabel}>Price (Rs):</ThemedText>
+                  <TextInput
+                    style={styles.priceInput}
+                    value={customPrice}
+                    onChangeText={setCustomPrice}
+                    placeholder="Enter price"
+                    keyboardType="numeric"
+                    editable={!isFreeItem}
+                  />
+                </View>
+                  {/* Quantity Input */}
+                <View style={styles.inputContainer}>
+                  <ThemedText style={styles.inputLabel}>Quantity:</ThemedText>
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={customQuantity}
+                    onChangeText={setCustomQuantity}
+                    placeholder="Enter quantity"
+                    keyboardType="numeric"
+                  />
+                  {isFreeItem && (
+                    <ThemedText style={styles.freeQtyHint}>Free quantity</ThemedText>
+                  )}
+                </View>
+                
                 <View style={styles.discountContainer}>
                   <ThemedText style={styles.optionLabel}>Discount %:</ThemedText>
                   <View style={styles.discountButtonsRow}>
@@ -581,8 +638,7 @@ export default function PosScreen() {
                     ))}
                   </View>
                 </View>
-                
-                <TouchableOpacity
+                  <TouchableOpacity
                   style={[
                     styles.freeItemButton,
                     isFreeItem && styles.activeFreeItemButton
@@ -591,6 +647,10 @@ export default function PosScreen() {
                     setIsFreeItem(!isFreeItem);
                     if (!isFreeItem) { // If turning on free item
                       setDiscountPercent(0); // Reset discount
+                      setCustomPrice('0'); // Set price to 0 for free item
+                      // Keep quantity editable for free items
+                    } else {
+                      setCustomPrice(selectedProduct.price.toString()); // Reset to original price
                     }
                   }}
                 >
@@ -599,12 +659,25 @@ export default function PosScreen() {
                       <FontAwesome 
                         name={isFreeItem ? "check-square-o" : "square-o"} 
                         size={20} 
-                        color={isFreeItem ? "#4CAF50" : "#666"} 
+                        color={isFreeItem ? "#4CAF50" : "#333"} 
                       />
                     </Text>
-                    <Text style={styles.freeItemButtonText}>Free Item</Text>
+                    <Text style={styles.freeItemButtonText}>Free Item {isFreeItem ? '(0 Rs)' : ''}</Text>
                   </View>
                 </TouchableOpacity>
+                
+                {/* Total Preview */}
+                <View style={styles.totalPreview}>
+                  <ThemedText style={styles.totalPreviewText}>
+                    Total: Rs {(
+                      isFreeItem ? 0 : 
+                      (parseFloat(customPrice) || 0) * 
+                      (parseInt(customQuantity) || 1) * 
+                      (1 - discountPercent/100)
+                    ).toFixed(2)}
+                  </ThemedText>
+                </View>
+                
                 <TouchableOpacity
                   style={styles.addToCartButton}
                   onPress={addToCart}
@@ -815,11 +888,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-  },
-  scannerInfoText: {
+  },  scannerInfoText: {
     fontSize: 14,
     marginLeft: 8,
-    color: '#666',
+    color: '#333',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -1000,20 +1072,18 @@ const styles = StyleSheet.create({
   searchItemName: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  searchItemCategory: {
+  },  searchItemCategory: {
     fontSize: 14,
-    color: '#666',
+    color: '#333',
     marginTop: 3,
   },
   searchItemBarcode: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 5,
-  },
-  searchItemBarcodeText: {
+  },  searchItemBarcodeText: {
     fontSize: 12,
-    color: '#666',
+    color: '#333',
     marginLeft: 5,
   },
   searchItemPriceContainer: {
@@ -1024,10 +1094,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2196F3',
     fontWeight: 'bold',
-  },
-  searchItemStock: {
+  },  searchItemStock: {
     fontSize: 12,
-    color: '#666',
+    color: '#333',
     marginTop: 3,
   },
   quickSelectContainer: {
@@ -1037,12 +1106,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-  },
-  quickSelectTitle: {
+  },  quickSelectTitle: {
     fontSize: 14,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#555',
+    color: '#333',
   },
   quickSelectButton: {
     flexDirection: 'row',
@@ -1113,11 +1181,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-  },
-  emptyCartText: {
+  },  emptyCartText: {
     fontSize: 18,
     marginVertical: 20,
-    color: '#666',
+    color: '#333',
   },
   addItemsButton: {
     backgroundColor: '#2196F3',
@@ -1149,10 +1216,9 @@ const styles = StyleSheet.create({
   cartItemName: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  cartItemPrice: {
+  },  cartItemPrice: {
     fontSize: 14,
-    color: '#666',
+    color: '#333',
     marginTop: 3,
   },
   cartItemQuantity: {
@@ -1391,8 +1457,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
     flex: 1,
-  },
-  newSaleButton: {
+  },  newSaleButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 5,
     paddingVertical: 12,
@@ -1401,5 +1466,60 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+  },
+  inputContainer: {
+    marginBottom: 15,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#333',
+  },
+  priceInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  quantityInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  freeQtyHint: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  totalPreview: {
+    backgroundColor: '#f5f5f5',
+    padding: 10,
+    borderRadius: 5,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  totalPreviewText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
+  },  selectedProductStock: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  originalPriceText: {
+    fontSize: 12,
+    color: '#888',
+    fontStyle: 'italic',
+    textDecorationLine: 'line-through',
   },
 });

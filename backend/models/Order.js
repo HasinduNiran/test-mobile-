@@ -48,12 +48,11 @@ const OrderSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: ['Cash', 'Card', 'Mobile Payment']
-  },
-  status: {
+  },  status: {
     type: String,
     required: true,
-    enum: ['Pending', 'Completed', 'Cancelled'],
-    default: 'Completed'
+    enum: ['Pending', 'Confirmed', 'Out of Warehouse', 'In Transit', 'Delivered', 'Paid', 'Completed', 'Cancelled'],
+    default: 'Pending'
   },
   customerName: {
     type: String,

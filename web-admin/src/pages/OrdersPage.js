@@ -3,6 +3,7 @@ import {
     ArcElement // Needed for Pie/Doughnut charts
     ,
 
+
     BarElement,
     CategoryScale,
     Chart as ChartJS,
@@ -12,7 +13,7 @@ import {
     Tooltip
 } from 'chart.js';
 import { useContext, useEffect, useState } from 'react';
-import { Card, Col, Container, Form, Row } from 'react-bootstrap';
+import { Button, Card, Col, Container, Form, Modal, Row } from 'react-bootstrap';
 import { Bar, Pie } from 'react-chartjs-2'; // Import Pie for charts
 import { FaCalendarAlt, FaChartPie, FaFilter, FaShoppingCart, FaTags } from 'react-icons/fa';
 import ErrorMessage from '../components/ErrorMessage';
@@ -33,11 +34,91 @@ const OrdersPage = () => {
   const { userInfo } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
-  const [selectedRepresentative, setSelectedRepresentative] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedRepresentative, setSelectedRepresentative] = useState('');  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [productsSold, setProductsSold] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Status update modal state
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedNewStatus, setSelectedNewStatus] = useState('');
+  // Status update functionality
+  const openStatusModal = (order) => {
+    setSelectedOrder(order);
+    setSelectedNewStatus('');
+    setShowStatusModal(true);
+  };
+
+  const closeStatusModal = () => {
+    setShowStatusModal(false);
+    setSelectedOrder(null);
+    setSelectedNewStatus('');
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!selectedOrder || !selectedNewStatus) return;
+
+    try {
+      await axios.patch(`/api/orders/${selectedOrder._id}/status`, { status: selectedNewStatus });
+      
+      // Update the local orders state
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order._id === selectedOrder._id ? { ...order, status: selectedNewStatus } : order
+        )
+      );
+
+      closeStatusModal();
+    } catch (err) {
+      console.error('Error updating order status:', err);
+      alert('Failed to update order status. Please try again.');
+    }
+  };
+
+  // Get status badge color
+  const getStatusBadgeColor = (status) => {
+    switch (status) {
+      case 'Pending': return 'warning';
+      case 'Confirmed': return 'info';
+      case 'Out of Warehouse': return 'primary';
+      case 'In Transit': return 'secondary';
+      case 'Delivered': return 'success';
+      case 'Paid': return 'success';
+      case 'Completed': return 'success';
+      case 'Cancelled': return 'danger';
+      default: return 'secondary';
+    }
+  };
+  // Get next available statuses based on current status
+  const getNextStatuses = (currentStatus) => {
+    const statusFlow = {
+      'Pending': ['Confirmed', 'Cancelled'],
+      'Confirmed': ['Out of Warehouse', 'Cancelled'],
+      'Out of Warehouse': ['In Transit', 'Cancelled'],
+      'In Transit': ['Delivered', 'Cancelled'],
+      'Delivered': ['Paid'],
+      'Paid': ['Completed'],
+      'Completed': [],
+      'Cancelled': []
+    };
+    return statusFlow[currentStatus] || [];
+  };
+
+  // Get all available statuses for admin (can change to any status except current)
+  const getAllStatusesForAdmin = (currentStatus) => {
+    const allStatuses = ['Pending', 'Confirmed', 'Out of Warehouse', 'In Transit', 'Delivered', 'Paid', 'Completed', 'Cancelled'];
+    return allStatuses.filter(status => status !== currentStatus);
+  };
+
+  // Get available statuses based on user role
+  const getAvailableStatuses = (currentStatus, isAdmin) => {
+    if (isAdmin) {
+      return getAllStatusesForAdmin(currentStatus);
+    } else {
+      return getNextStatuses(currentStatus);
+    }
+  };
 
   // Helper function to aggregate products from orders
   const aggregateProducts = (orderList) => {
@@ -267,9 +348,8 @@ const OrdersPage = () => {
                       </div>
                     </div>
                     <div className="col-md-4">
-                      <div className="text-center p-3 bg-light rounded">
-                        <h4 className="text-success">
-                          ${orders.reduce((sum, order) => sum + order.total, 0).toFixed(2)}
+                      <div className="text-center p-3 bg-light rounded">                        <h4 className="text-success">
+                          ${orders.reduce((sum, order) => sum + (order.total || 0), 0).toFixed(2)}
                         </h4>
                         <small className="text-muted">Total Sales</small>
                       </div>
@@ -284,8 +364,7 @@ const OrdersPage = () => {
                     </div>
                   </div>
                   <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
+                    <table className="table table-hover">                      <thead>
                         <tr>
                           <th>Order ID</th>
                           <th>Customer</th>
@@ -293,6 +372,7 @@ const OrdersPage = () => {
                           <th>Items</th>
                           <th>Total</th>
                           <th>Status</th>
+                          <th>Actions</th>
                           <th>Time</th>
                         </tr>
                       </thead>
@@ -303,11 +383,28 @@ const OrdersPage = () => {
                             <td>{order.customerName}</td>
                             {userInfo?.role === 'admin' && <td>{order.soldBy?.username || 'N/A'}</td>}
                             <td>{order.items.length}</td>
-                            <td>${order.total.toFixed(2)}</td>
+                            <td>${(order.total || 0).toFixed(2)}</td>
                             <td>
-                              <span className={`badge bg-${order.status === 'Completed' ? 'success' : order.status === 'Pending' ? 'warning' : 'danger'}`}>
+                              <span className={`badge bg-${getStatusBadgeColor(order.status)}`}>
                                 {order.status}
                               </span>
+                            </td>                            <td>
+                              {/* Status Update Button - show if user can update this order */}
+                              {(userInfo?.role === 'admin' || order.soldBy?._id === userInfo.id) && 
+                               getAvailableStatuses(order.status, userInfo?.role === 'admin').length > 0 && (
+                                <Button 
+                                  variant="outline-primary" 
+                                  size="sm"
+                                  onClick={() => openStatusModal(order)}
+                                >
+                                  {userInfo?.role === 'admin' ? 'Change Status' : 'Update Status'}
+                                </Button>
+                              )}
+                              {/* Show "-" if no actions available */}
+                              {(!((userInfo?.role === 'admin' || order.soldBy?._id === userInfo.id) && 
+                                 getAvailableStatuses(order.status, userInfo?.role === 'admin').length > 0)) && (
+                                <span className="text-muted">-</span>
+                              )}
                             </td>
                             <td>{new Date(order.createdAt).toLocaleTimeString()}</td>
                           </tr>
@@ -316,8 +413,7 @@ const OrdersPage = () => {
                     </table>
                   </div>
                 </>
-              ) : (
-                <div className="text-center p-4">
+              ) : (                <div className="text-center p-4">
                   <FaShoppingCart size={48} className="text-muted mb-3" />
                   <p className="text-muted">No orders found for {new Date(selectedDate).toLocaleDateString()}</p>
                 </div>
@@ -372,7 +468,7 @@ const OrdersPage = () => {
                       <tr key={item.productId}>
                         <td>{item.productName}</td>
                         <td>{item.totalQuantitySold}</td>
-                        <td>${item.totalValueSold.toFixed(2)}</td>
+                        <td>${(item.totalValueSold || 0).toFixed(2)}</td>
                       </tr>
                     )) : (
                       <tr>
@@ -385,9 +481,66 @@ const OrdersPage = () => {
                 </table>
               </div>
             </Card.Body>
-          </Card>
-        </Col>
+          </Card>        </Col>
       </Row>
+
+      {/* Status Update Modal */}
+      <Modal show={showStatusModal} onHide={closeStatusModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Update Order Status</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedOrder && (
+            <>
+              <p><strong>Order ID:</strong> {selectedOrder._id}</p>
+              <p><strong>Customer:</strong> {selectedOrder.customerName}</p>
+              <p><strong>Current Status:</strong> <span className={`badge bg-${getStatusBadgeColor(selectedOrder.status)}`}>{selectedOrder.status}</span></p>
+              <p><strong>Total:</strong> ${(selectedOrder?.total || 0).toFixed(2)}</p>
+              
+              <Form.Group className="mt-3">
+                <Form.Label>Select New Status:</Form.Label>
+                <Form.Select 
+                  value={selectedNewStatus} 
+                  onChange={(e) => setSelectedNewStatus(e.target.value)}
+                  required
+                >
+                  <option value="">-- Select Status --</option>
+                  {getAvailableStatuses(selectedOrder.status, userInfo?.role === 'admin').map(status => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+
+              {selectedNewStatus && (
+                <div className="mt-3 p-3 bg-light rounded">
+                  <p className="mb-1"><strong>Status Change:</strong></p>
+                  <p className="mb-0">
+                    <span className={`badge bg-${getStatusBadgeColor(selectedOrder.status)} me-2`}>
+                      {selectedOrder.status}
+                    </span>
+                    →
+                    <span className={`badge bg-${getStatusBadgeColor(selectedNewStatus)} ms-2`}>
+                      {selectedNewStatus}
+                    </span>
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeStatusModal}>
+            Cancel
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleStatusUpdate}
+            disabled={!selectedNewStatus}
+          >
+            Update Status
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

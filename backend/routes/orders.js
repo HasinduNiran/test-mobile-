@@ -248,4 +248,38 @@ router.get('/summary/stats', auth, async (req, res) => {
   }
 });
 
+// Update order status
+router.patch('/:id/status', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const orderId = req.params.id;
+
+    // Validate status
+    const validStatuses = ['Pending', 'Confirmed', 'Out of Warehouse', 'In Transit', 'Delivered', 'Paid', 'Completed', 'Cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    // Find the order
+    const order = await Order.findById(orderId).populate('soldBy', 'username email role');
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Check permissions
+    if (req.user.role !== 'admin' && order.soldBy._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized to update this order' });
+    }
+
+    // Update the status
+    order.status = status;
+    await order.save();
+
+    res.json(order);
+  } catch (err) {
+    console.error('Error updating order status:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

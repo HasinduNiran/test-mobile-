@@ -110,7 +110,7 @@ export default function InventoryScreen() {
           </View>
           {item.barcode && (
             <View style={styles.barcodeContainer}>
-              <FontAwesome name="barcode" size={14} color="#666" />
+              <FontAwesome name="barcode" size={14} color="#333" />
               <ThemedText style={styles.barcodeText}>{item.barcode}</ThemedText>
             </View>
           )}
@@ -217,7 +217,7 @@ export default function InventoryScreen() {
       </View>
       
       <View style={styles.searchContainer}>
-        <FontAwesome name="search" size={16} color="#666" style={styles.searchIcon} />
+        <FontAwesome name="search" size={16} color="#333" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name, barcode, category..."
@@ -230,7 +230,7 @@ export default function InventoryScreen() {
             style={styles.clearSearch} 
             onPress={() => setSearchText('')}
           >
-            <FontAwesome name="times-circle" size={16} color="#666" />
+            <FontAwesome name="times-circle" size={16} color="#333" />
           </TouchableOpacity>
         )}
       </View>
@@ -365,10 +365,9 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  itemCategory: {
+  },  itemCategory: {
     fontSize: 14,
-    color: '#666',
+    color: '#333',
     marginBottom: 5,
   },
   itemMetaRow: {
@@ -391,19 +390,17 @@ const styles = StyleSheet.create({
   },
   lowQuantity: {
     color: '#d32f2f',
-  },
-  itemUnit: {
+  },  itemUnit: {
     fontSize: 12,
-    color: '#999',
+    color: '#333',
   },
   barcodeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
-  },
-  barcodeText: {
+  },  barcodeText: {
     fontSize: 12,
-    color: '#666',
+    color: '#333',
     marginLeft: 5,
   },
   errorContainer: {
@@ -435,10 +432,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
-  },
-  emptyText: {
+  },  emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: '#333',
     textAlign: 'center',
     marginTop: 15,
   },
