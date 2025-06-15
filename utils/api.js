@@ -17,21 +17,21 @@ if (Platform.OS === 'android') {
   
   if (isEmulator) {
     // 10.0.2.2 is the special IP for Android emulator to reach host machine's localhost
-    API_URL = 'http://10.0.2.2:5000/api';
+    API_URL = 'http://16.171.225.212/api2';
   } else {
     // For physical Android devices, use your computer's actual LAN IP
-    API_URL = `http://${YOUR_LOCAL_IP}:5000/api`;
+    API_URL = 'http://16.171.225.212/api2';
   }
 } else if (Platform.OS === 'ios') {
   // For iOS simulator
-  API_URL = 'http://localhost:5000/api';
+  API_URL = 'http://16.171.225.212/api2';
 } else {
   // Web environment
-  API_URL = 'http://localhost:5000/api';
+  API_URL = 'http://16.171.225.212/api2';
 }
 
 const apiClient = axios.create({
-  baseURL: API_URL,
+  baseURL: `${API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -56,20 +56,31 @@ export const checkServerConnection = async () => {
   try {
     console.log('Checking server connection at:', API_URL);
     
-    // Try to reach the root API endpoint with a shorter timeout
-    const response = await axios.get(API_URL.replace('/api', ''), { 
-      timeout: 3000,
-      // Prevent throwing on HTTP error responses
-      validateStatus: function (status) {
-        return status >= 200 && status < 600; // Consider any response a success
-      }
-    });
+    // Try multiple endpoints to check connectivity
+    const endpoints = ['/health', '/', '/api/auth/test'];
     
-    console.log('Server connection response:', response.status);
-    return response.status < 500; // Any response that's not a server error
+    for (const endpoint of endpoints) {
+      try {
+        const response = await axios.get(`${API_URL}${endpoint}`, { 
+          timeout: 5000,
+          validateStatus: function (status) {
+            return status >= 200 && status < 600; // Consider any response a success
+          }
+        });
+        
+        console.log(`Server connection response for ${endpoint}:`, response.status);
+        if (response.status < 500) {
+          return true; // Successfully connected
+        }
+      } catch (endpointError) {
+        console.log(`Failed to connect to ${endpoint}:`, endpointError.message);
+        continue; // Try next endpoint
+      }
+    }
+    
+    return false; // All endpoints failed
   } catch (error) {
     console.error('Server connection check failed:', error.message);
-    // Log more details about the error
     if (error.code) {
       console.error('Error code:', error.code);
     }

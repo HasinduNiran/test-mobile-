@@ -18,17 +18,17 @@ if (Platform.OS === 'android') {
   
   if (isEmulator) {
     // 10.0.2.2 is the special IP for Android emulator to reach host machine's localhost
-    API_URL = 'http://10.0.2.2:5000/api';
+    API_URL = 'http://16.171.225.212/api2';
   } else {
     // For physical Android devices, use your computer's actual LAN IP
-    API_URL = `http://${YOUR_LOCAL_IP}:5000/api`;
+    API_URL = 'http://16.171.225.212/api2';
   }
 } else if (Platform.OS === 'ios') {
   // For iOS simulator
-  API_URL = 'http://localhost:5000/api';
+  API_URL = 'http://16.171.225.212/api2';
 } else {
   // Web environment
-  API_URL = 'http://localhost:5000/api';
+  API_URL = 'http://16.171.225.212/api2';
 }
 
 export const AuthContext = createContext();
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Network Error: Server is unreachable. Please check your internet connection or try again later.');
       }
       
-      const response = await axios.post(`${API_URL}/auth/register`, {
+      const response = await axios.post(`${API_URL}/api/auth/register`, {
         username,
         email,
         password

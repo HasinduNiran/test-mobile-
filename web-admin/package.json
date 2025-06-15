@@ -9,6 +9,8 @@
     "axios": "^1.5.0",
     "bootstrap": "^5.3.1",
     "chart.js": "^4.4.0",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
     "jwt-decode": "^3.1.2",
     "react": "^18.2.0",
     "react-bootstrap": "^2.8.0",
@@ -45,5 +47,5 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:5000"
+  "proxy": "http://16.171.225.212/api2"
 }
