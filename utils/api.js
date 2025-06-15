@@ -180,4 +180,45 @@ export const getOrdersSummary = async () => {
   }
 };
 
+// Customer related APIs
+export const getCustomers = async () => {
+  try {
+    const response = await apiClient.get('/customers');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching customers:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const addCustomer = async (customerData) => {
+  try {
+    const response = await apiClient.post('/customers', customerData);
+    return response.data;
+  } catch (error) {
+    console.error('Error adding customer:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const updateCustomer = async (customerId, customerData) => {
+  try {
+    const response = await apiClient.put(`/customers/${customerId}`, customerData);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating customer:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const deleteCustomer = async (customerId) => {
+  try {
+    const response = await apiClient.delete(`/customers/${customerId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting customer:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
 export default apiClient;

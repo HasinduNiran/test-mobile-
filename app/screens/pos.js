@@ -38,11 +38,13 @@ export default function PosScreen() {
   const [visiblePanel, setVisiblePanel] = useState('scanner'); // 'scanner', 'cart', 'receipt'
   const [receiptData, setReceiptData] = useState(null);
   const searchInputRef = useRef(null);
-  const [lastScannedCode, setLastScannedCode] = useState('');  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [discountPercent, setDiscountPercent] = useState(0);
-  const [isFreeItem, setIsFreeItem] = useState(false);
+  const [lastScannedCode, setLastScannedCode] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [paidQuantity, setPaidQuantity] = useState('1');
+  const [freeQuantity, setFreeQuantity] = useState('0'); // New state for free quantity
   const [customPrice, setCustomPrice] = useState('');
-  const [customQuantity, setCustomQuantity] = useState('1');
+  const [discountPercentInput, setDiscountPercentInput] = useState('0'); // New state for discount input
+
   const [orderPlacedMessage, setOrderPlacedMessage] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   
@@ -89,92 +91,120 @@ export default function PosScreen() {
   };  // Select product from search results
   const selectProduct = (item) => {
     setSelectedProduct(item);
-    setDiscountPercent(0);
-    setIsFreeItem(false);
     setCustomPrice(item.price.toString());
-    setCustomQuantity('1');
+    setPaidQuantity('1');
+    setFreeQuantity('0'); // Initialize free quantity
+    setDiscountPercentInput('0'); // Initialize discount input
   };
     // Add item to cart
   const addToCart = () => {
     if (!selectedProduct) return;
-    
-    const item = selectedProduct;
-    const finalPrice = isFreeItem ? 0 : (parseFloat(customPrice) || item.price);
-    const quantity = parseInt(customQuantity) || 1;
-    
-    // Validate inputs
-    if (quantity <= 0) {
-      Alert.alert("Invalid Quantity", "Please enter a valid quantity greater than 0.");
-      return;
-    }
-    
-    if (!isFreeItem && (finalPrice < 0 || isNaN(finalPrice))) {
-      Alert.alert("Invalid Price", "Please enter a valid price.");
+
+    const currentPaidQuantity = parseInt(paidQuantity) || 0;
+    const currentFreeQuantity = parseInt(freeQuantity) || 0;
+    const priceForPaidItems = parseFloat(customPrice) || selectedProduct.price;
+    let currentDiscountPercent = parseFloat(discountPercentInput) || 0;
+
+    if (currentDiscountPercent < 0 || currentDiscountPercent > 100) {
+      Alert.alert("Invalid Discount", "Discount must be between 0 and 100.");
       return;
     }
 
-    // Create item with custom price, discount and quantity info
-    const cartItem = {
-      ...item,
-      price: finalPrice,
-      originalPrice: item.price,
-      quantity: quantity,
-      discountPercent: isFreeItem ? 100 : discountPercent,
-      isFreeItem: isFreeItem
-    };
-      setCartItems(prevItems => {
-      // Check if item is already in cart with same price
-      const existingItem = prevItems.find(i => 
-        i._id === item._id && 
-        i.price === finalPrice && 
-        i.discountPercent === cartItem.discountPercent
-      );
-      
-      if (existingItem) {
-        // Increment quantity
-        return prevItems.map(i => 
-          i._id === item._id && i.price === finalPrice && i.discountPercent === cartItem.discountPercent
-            ? { ...i, quantity: i.quantity + quantity } 
-            : i
-        );
-      } else {
-        // Add new item
-        return [...prevItems, cartItem];
+    if (currentPaidQuantity <= 0 && currentFreeQuantity <= 0) {
+      Alert.alert("No Quantity", "Please enter a quantity for paid or free items.");
+      return;
+    }
+
+    let itemsToAdd = [];
+
+    // Handle paid items
+    if (currentPaidQuantity > 0) {
+      if (priceForPaidItems < 0 || isNaN(priceForPaidItems)) {
+        Alert.alert("Invalid Price", "Please enter a valid price for paid items.");
+        return;
       }
+      const paidItem = {
+        ...selectedProduct,
+        price: priceForPaidItems,
+        originalPrice: selectedProduct.price,
+        quantity: currentPaidQuantity,
+        discountPercent: currentDiscountPercent,
+        isFreeItem: false,
+        // Ensure a unique key part if adding paid and free of same product simultaneously,
+        // if merging logic doesn't distinguish them enough.
+        // For now, relying on distinct price/discount or isFreeItem to separate.
+        cartKey: `${selectedProduct._id}_paid_${priceForPaidItems}_${currentDiscountPercent}` 
+      };
+      itemsToAdd.push(paidItem);
+    }
+
+    // Handle free items
+    if (currentFreeQuantity > 0) {
+      const freeItem = {
+        ...selectedProduct,
+        price: 0, // Free items have zero price
+        originalPrice: selectedProduct.price,
+        quantity: currentFreeQuantity,
+        discountPercent: 100, // Effectively 100% discount
+        isFreeItem: true,
+        cartKey: `${selectedProduct._id}_free`
+      };
+      itemsToAdd.push(freeItem);
+    }
+
+    setCartItems(prevItems => {
+      let updatedItems = [...prevItems];
+      itemsToAdd.forEach(itemToAdd => {
+        const existingItemIndex = updatedItems.findIndex(i =>
+          i._id === itemToAdd._id &&
+          i.isFreeItem === itemToAdd.isFreeItem &&
+          (i.isFreeItem || (i.price === itemToAdd.price && i.discountPercent === itemToAdd.discountPercent))
+        );
+
+        if (existingItemIndex > -1) {
+          updatedItems[existingItemIndex] = {
+            ...updatedItems[existingItemIndex],
+            quantity: updatedItems[existingItemIndex].quantity + itemToAdd.quantity,
+          };
+        } else {
+          updatedItems.push(itemToAdd);
+        }
+      });
+      return updatedItems;
     });
-      // Clear search and selection after adding
+
+    // Clear search and selection after adding
     setSearchText('');
     setSearchResults([]);
-    setSelectedProduct(null);
+    setSelectedProduct(null); // This will hide the product options
     setCustomPrice('');
-    setCustomQuantity('1');
-    setDiscountPercent(0);
-    setIsFreeItem(false);
+    setPaidQuantity('1');
+    setFreeQuantity('0');
+    setDiscountPercentInput('0');
     
-    // Save as last scanned if it came from barcode scan
-    if (searchText === item.barcode) {
-      setLastScannedCode(item.barcode);
+    if (searchText === selectedProduct.barcode) {
+      setLastScannedCode(selectedProduct.barcode);
     }
   };
   
   // Update cart item quantity
-  const updateQuantity = (itemId, newQuantity) => {
+  const updateQuantity = (cartKey, newQuantity) => {
     if (newQuantity <= 0) {
       // Remove item if quantity is 0 or less
-      setCartItems(prevItems => prevItems.filter(item => item._id !== itemId));
+      setCartItems(prevItems => prevItems.filter(item => item.cartKey !== cartKey));
     } else {
       // Update quantity
       setCartItems(prevItems => 
         prevItems.map(item =>
-          item._id === itemId ? { ...item, quantity: newQuantity } : item
+          item.cartKey === cartKey ? { ...item, quantity: newQuantity } : item
         )
       );
     }
   };
   
   // Remove item from cart
-  const removeFromCart = (itemId) => {
-    setCartItems(prevItems => prevItems.filter(item => item._id !== itemId));
+  const removeFromCart = (cartKey) => {
+    setCartItems(prevItems => prevItems.filter(item => item.cartKey !== cartKey));
   };
     // Handle barcode scan
   const handleBarcodeScanned = async (barcode) => {
@@ -273,8 +303,10 @@ export default function PosScreen() {
     setReceiptData(null);
     setVisiblePanel('scanner');
     setSelectedProduct(null);
-    setDiscountPercent(0);
-    setIsFreeItem(false);
+    setCustomPrice('');
+    setPaidQuantity('1');
+    setFreeQuantity('0');
+    setDiscountPercentInput('0');
     setOrderPlacedMessage('');
     setIsPrinting(false);
   };
@@ -332,7 +364,7 @@ export default function PosScreen() {
       
       <View style={styles.cartItemQuantity}>        <TouchableOpacity 
           style={styles.quantityButton}
-          onPress={() => updateQuantity(item._id, item.quantity - 1)}
+          onPress={() => updateQuantity(item.cartKey, item.quantity - 1)}
         >
           <Text>
             <FontAwesome name="minus" size={12} color="#fff" />
@@ -342,7 +374,7 @@ export default function PosScreen() {
         <ThemedText style={styles.quantityText}>{item.quantity}</ThemedText>
           <TouchableOpacity 
           style={styles.quantityButton}
-          onPress={() => updateQuantity(item._id, item.quantity + 1)}
+          onPress={() => updateQuantity(item.cartKey, item.quantity + 1)}
         >
           <Text>
             <FontAwesome name="plus" size={12} color="#fff" />
@@ -355,7 +387,7 @@ export default function PosScreen() {
       </ThemedText>
         <TouchableOpacity 
         style={styles.removeButton}
-        onPress={() => removeFromCart(item._id)}
+        onPress={() => removeFromCart(item.cartKey)}
       >
         <Text>
           <FontAwesome name="trash" size={16} color="#FF5252" />
@@ -395,35 +427,43 @@ export default function PosScreen() {
         
         <View style={styles.receiptItemsHeader}>
           <ThemedText style={[styles.receiptItemsHeaderText, { flex: 2 }]}>Item</ThemedText>
-          <ThemedText style={[styles.receiptItemsHeaderText, { flex: 0.5 }]}>Qty</ThemedText>
-          <ThemedText style={[styles.receiptItemsHeaderText, { flex: 0.8 }]}>Price</ThemedText>
-          <ThemedText style={[styles.receiptItemsHeaderText, { flex: 0.8 }]}>Total</ThemedText>
+          <ThemedText style={[styles.receiptItemsHeaderText, { flex: 0.5, textAlign: 'right' }]}>Qty</ThemedText>
+          <ThemedText style={[styles.receiptItemsHeaderText, { flex: 0.8, textAlign: 'right' }]}>Price</ThemedText>
+          <ThemedText style={[styles.receiptItemsHeaderText, { flex: 0.8, textAlign: 'right' }]}>Total</ThemedText>
         </View>
         
         <FlatList
           data={receiptData.items}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item.cartKey} 
           style={styles.receiptItemsList}
           renderItem={({ item }) => (
             <View style={styles.receiptItem}>
               <View style={[{flex: 2}, styles.receiptItemNameContainer]}>
-                <ThemedText style={styles.receiptItemText} numberOfLines={1}>
+                <ThemedText style={styles.receiptItemNamePrimary} numberOfLines={1}>
                   {item.name}
                 </ThemedText>
-                {item.discountPercent > 0 && (
-                  <ThemedText style={styles.receiptItemDiscount}>
+                {item.isFreeItem && (
+                  <ThemedText style={styles.receiptFreeTagDisplay}>FREE ITEM</ThemedText>
+                )}
+                {!item.isFreeItem && item.originalPrice && item.originalPrice !== item.price && (
+                  <ThemedText style={styles.receiptOriginalPriceDisplay}>
+                    (Original Price: Rs {item.originalPrice.toFixed(2)})
+                  </ThemedText>
+                )}
+                {!item.isFreeItem && item.discountPercent > 0 && (
+                  <ThemedText style={styles.receiptDiscountDisplay}>
                     ({item.discountPercent}% off)
                   </ThemedText>
                 )}
               </View>
-              <ThemedText style={[styles.receiptItemText, { flex: 0.5 }]}>
+              <ThemedText style={[styles.receiptItemText, { flex: 0.5, textAlign: 'right' }]}>
                 {item.quantity}
               </ThemedText>
-              <ThemedText style={[styles.receiptItemText, { flex: 0.8 }]}>
-                Rs {(item.price * (1 - item.discountPercent/100)).toFixed(2)}
+              <ThemedText style={[styles.receiptItemText, { flex: 0.8, textAlign: 'right' }]}>
+                Rs {(item.price * (1 - (item.discountPercent || 0)/100)).toFixed(2)}
               </ThemedText>
-              <ThemedText style={[styles.receiptItemText, { flex: 0.8 }]}>
-                Rs {(item.quantity * item.price * (1 - item.discountPercent/100)).toFixed(2)}
+              <ThemedText style={[styles.receiptItemText, { flex: 0.8, textAlign: 'right' }]}>
+                Rs {(item.quantity * item.price * (1 - (item.discountPercent || 0)/100)).toFixed(2)}
               </ThemedText>
             </View>
           )}
@@ -573,11 +613,11 @@ export default function PosScreen() {
           </View>
           
           {/* Search Results List */}
-          {searchResults.length > 0 && (
+          {searchResults.length > 0 && !selectedProduct && ( // Hide when a product is selected
             <FlatList
               data={searchResults}
               renderItem={renderSearchItem}
-              keyExtractor={(item) => item._id}
+              keyExtractor={(item, index) => `${item._id}-${index}`} // Modified to ensure unique keys
               style={styles.searchResults}
             />
           )}
@@ -600,81 +640,66 @@ export default function PosScreen() {
                     onChangeText={setCustomPrice}
                     placeholder="Enter price"
                     keyboardType="numeric"
-                    editable={!isFreeItem}
                   />
                 </View>
-                  {/* Quantity Input */}
+                  {/* Paid Quantity Input */}
                 <View style={styles.inputContainer}>
-                  <ThemedText style={styles.inputLabel}>Quantity:</ThemedText>
+                  <ThemedText style={styles.inputLabel}>Paid Quantity:</ThemedText>
                   <TextInput
                     style={styles.quantityInput}
-                    value={customQuantity}
-                    onChangeText={setCustomQuantity}
-                    placeholder="Enter quantity"
+                    value={paidQuantity}
+                    onChangeText={setPaidQuantity}
+                    placeholder="Paid Qty"
                     keyboardType="numeric"
                   />
-                  {isFreeItem && (
-                    <ThemedText style={styles.freeQtyHint}>Free quantity</ThemedText>
-                  )}
+                </View>
+
+                {/* Free Quantity Input */}
+                <View style={styles.inputContainer}>
+                  <ThemedText style={styles.inputLabel}>Free Quantity:</ThemedText>
+                  <TextInput
+                    style={styles.quantityInput}
+                    value={freeQuantity}
+                    onChangeText={setFreeQuantity}
+                    placeholder="Free Qty"
+                    keyboardType="numeric"
+                  />
                 </View>
                 
-                <View style={styles.discountContainer}>
-                  <ThemedText style={styles.optionLabel}>Discount %:</ThemedText>
-                  <View style={styles.discountButtonsRow}>
-                    {[0, 5, 10, 15, 20].map(percent => (
-                      <TouchableOpacity 
-                        key={`discount-${percent}`}
-                        style={[
-                          styles.discountButton, 
-                          discountPercent === percent && styles.activeDiscountButton
-                        ]}
-                        onPress={() => {
-                          setDiscountPercent(percent);
-                          setIsFreeItem(false);
-                        }}
-                      >
-                        <Text style={styles.discountButtonText}>{percent}%</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                {/* Discount Input */}
+                <View style={styles.inputContainer}>
+                  <ThemedText style={styles.inputLabel}>Discount % (for paid items):</ThemedText>
+                  <TextInput
+                    style={styles.discountInput}
+                    value={discountPercentInput}
+                    onChangeText={(text) => {
+                      const numericValue = text.replace(/[^0-9.]/g, '');
+                      setDiscountPercentInput(numericValue);
+                    }}
+                    placeholder="e.g., 10"
+                    keyboardType="numeric"
+                  />
                 </View>
-                  <TouchableOpacity
-                  style={[
-                    styles.freeItemButton,
-                    isFreeItem && styles.activeFreeItemButton
-                  ]}
-                  onPress={() => {
-                    setIsFreeItem(!isFreeItem);
-                    if (!isFreeItem) { // If turning on free item
-                      setDiscountPercent(0); // Reset discount
-                      setCustomPrice('0'); // Set price to 0 for free item
-                      // Keep quantity editable for free items
-                    } else {
-                      setCustomPrice(selectedProduct.price.toString()); // Reset to original price
-                    }
-                  }}
-                >
-                  <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                    <Text style={{marginRight: 5}}>
-                      <FontAwesome 
-                        name={isFreeItem ? "check-square-o" : "square-o"} 
-                        size={20} 
-                        color={isFreeItem ? "#4CAF50" : "#333"} 
-                      />
-                    </Text>
-                    <Text style={styles.freeItemButtonText}>Free Item {isFreeItem ? '(0 Rs)' : ''}</Text>
-                  </View>
-                </TouchableOpacity>
+
+                {/* Removed Free Item Toggle and Discount Buttons */}
                 
                 {/* Total Preview */}
                 <View style={styles.totalPreview}>
                   <ThemedText style={styles.totalPreviewText}>
-                    Total: Rs {(
-                      isFreeItem ? 0 : 
-                      (parseFloat(customPrice) || 0) * 
-                      (parseInt(customQuantity) || 1) * 
-                      (1 - discountPercent/100)
-                    ).toFixed(2)}
+                    Selected Item Total: Rs {
+                      (() => {
+                        const pq = parseInt(paidQuantity) || 0;
+                        const cp = parseFloat(customPrice) || 0;
+                        const dp = parseFloat(discountPercentInput) || 0;
+                        if (pq > 0) {
+                          return (cp * pq * (1 - dp / 100)).toFixed(2);
+                        }
+                        return '0.00';
+                      })()
+                    }
+                  </ThemedText>
+                  <ThemedText style={styles.totalPreviewSubText}>
+                    (Paid: {paidQuantity || '0'}, Free: {freeQuantity || '0'})
                   </ThemedText>
                 </View>
                 
@@ -762,7 +787,7 @@ export default function PosScreen() {
               <FlatList
                 data={cartItems}
                 renderItem={renderCartItem}
-                keyExtractor={(item) => item._id}
+                keyExtractor={(item) => item.cartKey} 
                 style={styles.cartList}
               />
                 <View style={styles.cartSummaryContainer}>
@@ -947,525 +972,18 @@ const styles = StyleSheet.create({
   selectedProductName: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333', 
   },
   selectedProductPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2196F3',
+    fontSize: 14, 
+    color: '#555', 
+  },
+  selectedProductStock: {
+    fontSize: 14,
+    color: '#555',
   },
   optionsContainer: {
     marginTop: 10,
-  },
-  discountContainer: {
-    marginBottom: 15,
-  },
-  optionLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  discountButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  discountButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    minWidth: 45,
-    alignItems: 'center',
-  },
-  activeDiscountButton: {
-    backgroundColor: '#e3f2fd',
-    borderColor: '#2196F3',
-  },
-  discountButtonText: {
-    fontSize: 14,
-  },
-  freeItemButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-    padding: 10,
-    borderRadius: 4,
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  activeFreeItemButton: {
-    backgroundColor: '#e8f5e9',
-    borderColor: '#4CAF50',
-  },
-  freeItemButtonText: {
-    marginLeft: 10,
-    fontSize: 14,
-  },
-  addToCartButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    borderRadius: 4,
-    paddingVertical: 12,
-    elevation: 2,
-  },
-  addToCartButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  cartItemPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  discountText: {
-    marginLeft: 8,
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontSize: 12,
-    color: '#2196F3',
-  },
-  freeItemText: {
-    marginLeft: 8,
-    backgroundColor: '#e8f5e9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontSize: 12,
-    color: '#4CAF50',
-  },
-  receiptItemNameContainer: {
-    flexDirection: 'column',
-  },
-  receiptItemDiscount: {
-    fontSize: 11,
-    color: '#2196F3',
-    marginTop: 2,
-  },
-  orderSuccessMessage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e8f5e9',
-    padding: 10,
-    borderRadius: 5,
-    marginVertical: 10,
-  },
-  orderSuccessText: {
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#388E3C',
-    flex: 1,
-  },
-  searchItemContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  searchItemInfo: {
-    flex: 1,
-  },
-  searchItemName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },  searchItemCategory: {
-    fontSize: 14,
-    color: '#333',
-    marginTop: 3,
-  },
-  searchItemBarcode: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 5,
-  },  searchItemBarcodeText: {
-    fontSize: 12,
-    color: '#333',
-    marginLeft: 5,
-  },
-  searchItemPriceContainer: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  searchItemPrice: {
-    fontSize: 16,
-    color: '#2196F3',
-    fontWeight: 'bold',
-  },  searchItemStock: {
-    fontSize: 12,
-    color: '#333',
-    marginTop: 3,
-  },
-  quickSelectContainer: {
-    margin: 10,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },  quickSelectTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  quickSelectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#f0f9ff',
-    borderRadius: 5,
-  },
-  quickSelectButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#2196F3',
-  },
-  cartSummaryButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 10,
-    right: 10,
-    backgroundColor: '#2196F3',
-    borderRadius: 8,
-    padding: 15,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  cartSummaryContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cartSummaryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cartCountContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginRight: 15,
-  },
-  cartCount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginRight: 3,
-  },
-  cartCountLabel: {
-    fontSize: 14,
-    color: '#fff',
-  },
-  cartTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  viewCartText: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  
-  // Cart Screen
-  cartContainer: {
-    flex: 1,
-  },
-  emptyCartContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },  emptyCartText: {
-    fontSize: 18,
-    marginVertical: 20,
-    color: '#333',
-  },
-  addItemsButton: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
-  },
-  addItemsButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  cartList: {
-    flex: 1,
-  },
-  cartItem: {
-    flexDirection: 'row',
-    padding: 15,
-    backgroundColor: '#fff',
-    marginHorizontal: 10,
-    marginVertical: 5,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  cartItemInfo: {
-    flex: 1,
-  },
-  cartItemName: {
-    fontSize: 16,
-    fontWeight: '600',
-  },  cartItemPrice: {
-    fontSize: 14,
-    color: '#333',
-    marginTop: 3,
-  },
-  cartItemQuantity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  quantityButton: {
-    backgroundColor: '#2196F3',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quantityText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginHorizontal: 10,
-    minWidth: 20,
-    textAlign: 'center',
-  },
-  cartItemTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2196F3',
-    marginRight: 15,
-  },
-  removeButton: {
-    padding: 5,
-  },
-  cartSummaryContainer: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingHorizontal: 15,
-    paddingTop: 15,
-    paddingBottom: 25,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  summaryRowTotal: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  summaryLabelTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  summaryValueTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2196F3',
-  },
-  checkoutButtonsContainer: {
-    flexDirection: 'row',
-    marginTop: 15,
-  },
-  clearCartButton: {
-    backgroundColor: '#ff5252',
-    borderRadius: 5,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-    flex: 1,
-  },
-  checkoutButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 5,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 2,
-  },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  
-  // Receipt Screen
-  receiptContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 15,
-  },
-  receiptHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  receiptLogo: {
-    width: 60,
-    height: 60,
-    marginBottom: 10,
-  },
-  receiptCompanyName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  receiptCompanyAddress: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 3,
-  },
-  receiptCompanyContact: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  receiptDivider: {
-    height: 1,
-    backgroundColor: '#ddd',
-    width: '100%',
-    marginVertical: 15,
-  },
-  receiptOrderInfo: {
-    width: '100%',
-  },
-  receiptOrderInfoRow: {
-    flexDirection: 'row',
-    marginBottom: 5,
-  },
-  receiptLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    width: 80,
-  },
-  receiptValue: {
-    fontSize: 14,
-  },
-  receiptItemsHeader: {
-    flexDirection: 'row',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-  },
-  receiptItemsHeaderText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  receiptItemsList: {
-    flex: 1,
-  },
-  receiptItem: {
-    flexDirection: 'row',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  receiptItemText: {
-    fontSize: 14,
-  },
-  receiptSummary: {
-    paddingVertical: 10,
-  },
-  receiptSummaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  receiptSummaryLabel: {
-    fontSize: 14,
-  },
-  receiptSummaryValue: {
-    fontSize: 14,
-  },
-  receiptSummaryRowTotal: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-  },
-  receiptSummaryLabelTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  receiptSummaryValueTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  receiptFooter: {
-    alignItems: 'center',
-    marginVertical: 15,
-  },
-  receiptFooterText: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  receiptWebsite: {
-    fontSize: 14,
-    color: '#666',
-  },
-  receiptButtonsContainer: {
-    flexDirection: 'row',
-    marginTop: 20,
-  },
-  printButton: {
-    backgroundColor: '#607D8B',
-    borderRadius: 5,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-    flex: 1,
-  },  newSaleButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 5,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
   },
   inputContainer: {
     marginBottom: 15,
@@ -1477,49 +995,498 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   priceInput: {
+    height: 40,
+    borderColor: '#ccc',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
+    borderRadius: 4,
+    paddingHorizontal: 10,
     fontSize: 16,
     backgroundColor: '#fff',
   },
   quantityInput: {
+    height: 40,
+    borderColor: '#ccc',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
+    textAlign: 'center',
+    minWidth: 80,
+  },
+  discountInput: {
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 10,
     fontSize: 16,
     backgroundColor: '#fff',
   },
-  freeQtyHint: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
   totalPreview: {
-    backgroundColor: '#f5f5f5',
-    padding: 10,
-    borderRadius: 5,
-    marginVertical: 10,
+    marginTop: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#bbdefb',
   },
   totalPreviewText: {
     fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#333',
-  },  selectedProductStock: {
+    color: '#1976d2',
+  },
+  totalPreviewSubText: {
     fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
+    color: '#42a5f5',
+    marginTop: 4,
+  },
+  addToCartButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  addToCartButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  quickSelectContainer: {
+    margin: 10,
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  quickSelectTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
+  },
+  quickSelectButton: {
+    padding: 10,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 4,
+  },
+  quickSelectButtonText: {
+    fontSize: 14,
+    color: '#2196F3',
+  },
+  cartSummaryButton: {
+    backgroundColor: '#2196F3',
+    padding: 15,
+    margin: 10,
+    borderRadius: 8,
+  },
+  cartSummaryContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cartSummaryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cartCountContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  cartCount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  cartCountLabel: {
+    fontSize: 10,
+    color: '#fff',
+  },
+  cartTotal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  viewCartText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  
+  // Cart Screen
+  cartContainer: {
+    flex: 1,
+    padding: 10,
+  },
+  emptyCartContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyCartText: {
+    fontSize: 18,
+    color: '#777',
+    marginTop: 15,
+  },
+  addItemsButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 4,
+    marginTop: 20,
+  },
+  addItemsButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cartList: {
+    flex: 1,
+  },
+  cartItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    backgroundColor: '#fff',
+    borderRadius: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  cartItemInfo: {
+    flex: 1,
+  },
+  cartItemName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  cartItemPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  cartItemPrice: {
+    fontSize: 13,
+    color: '#555',
   },
   originalPriceText: {
-    fontSize: 12,
-    color: '#888',
-    fontStyle: 'italic',
+    fontSize: 11,
+    color: '#777',
     textDecorationLine: 'line-through',
+  },
+  discountText: {
+    fontSize: 12,
+    color: '#E91E63',
+    marginLeft: 8,
+    fontWeight: 'bold',
+  },
+  freeItemText: {
+    fontSize: 12,
+    color: 'green',
+    marginLeft: 8,
+    fontWeight: 'bold',
+  },
+  cartItemQuantity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 10,
+  },
+  quantityButton: {
+    backgroundColor: '#2196F3',
+    padding: 8,
+    borderRadius: 4,
+  },
+  quantityText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginHorizontal: 10,
+    minWidth: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  cartItemTotal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333', 
+    minWidth: 70, 
+    textAlign: 'right',
+  },
+  removeButton: {
+    padding: 8,
+    marginLeft: 5,
+  },
+  cartSummaryContainer: {
+    padding: 15,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    borderRadius: 4,
+    marginTop: 5,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    color: '#555',
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  summaryRowTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 5,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  summaryLabelTotal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  summaryValueTotal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2196F3',
+  },
+  checkoutButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 15,
+  },
+  clearCartButton: {
+    backgroundColor: '#FF5252',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 4,
+    flex: 1,
+    marginRight: 5,
+  },
+  checkoutButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 4,
+    flex: 1,
+    marginLeft: 5,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  
+  // Receipt Screen
+  receiptContainer: {
+    flex: 1,
+    padding: 15,
+    backgroundColor: '#fff',
+  },
+  receiptHeader: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  receiptLogo: {
+    width: 60,
+    height: 60,
+    marginBottom: 10,
+  },
+  receiptCompanyName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  receiptCompanyAddress: {
+    fontSize: 12,
+    color: '#555',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  receiptCompanyContact: {
+    fontSize: 12,
+    color: '#555',
+    marginBottom: 10,
+  },
+  receiptDivider: {
+    height: 1,
+    backgroundColor: '#eee',
+    width: '100%',
+    marginVertical: 10,
+  },
+  receiptOrderInfo: {
+    width: '100%',
+  },
+  receiptOrderInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  receiptLabel: {
+    fontSize: 12,
+    color: '#555',
+  },
+  receiptValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  receiptItemsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+    marginBottom: 5,
+  },
+  receiptItemsHeaderText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  receiptItemsList: {
+    maxHeight: 250, // Limit height for scrollability if many items
+  },
+  receiptItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  receiptItemNameContainer: {
+    // flex: 2 is applied inline
+  },
+  receiptItemNamePrimary: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  receiptFreeTagDisplay: {
+    fontSize: 10,
+    color: 'green',
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  receiptOriginalPriceDisplay: {
+    fontSize: 10,
+    color: '#555',
+    marginTop: 2,
+  },
+  receiptDiscountDisplay: {
+    fontSize: 10,
+    color: '#E91E63',
+    marginTop: 2,
+  },
+  receiptItemText: {
+    fontSize: 12,
+    color: '#333', 
+  },
+  /*receiptItemDiscount: { // This style was previously used inline, now covered by receiptDiscountDisplay
+    fontSize: 10,
+    color: '#E91E63',
+    marginLeft: 5, 
+  },*/
+  receiptSummary: {
+    marginTop: 15,
+  },
+  receiptSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  receiptSummaryLabel: {
+    fontSize: 14,
+    color: '#555',
+  },
+  receiptSummaryValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  receiptSummaryRowTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#ccc',
+  },
+  receiptSummaryLabelTotal: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  receiptSummaryValueTotal: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2196F3',
+  },
+  receiptFooter: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  receiptFooterText: {
+    fontSize: 12,
+    color: '#555',
+  },
+  receiptWebsite: {
+    fontSize: 12,
+    color: '#2196F3',
+    marginTop: 3,
+  },
+  orderSuccessMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    backgroundColor: '#e8f5e9', 
+    borderRadius: 4,
+    marginTop: 15,
+  },
+  orderSuccessText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#2e7d32', 
+    fontWeight: 'bold',
+  },
+  receiptButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  printButton: {
+    backgroundColor: '#607D8B', 
+    paddingVertical: 12,
+    borderRadius: 4,
+    flex: 1,
+    marginRight: 5,
+    alignItems: 'center',
+  },
+  newSaleButton: {
+    backgroundColor: '#009688', 
+    paddingVertical: 12,
+    borderRadius: 4,
+    flex: 1,
+    marginLeft: 5,
+    alignItems: 'center',
   },
 });

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import { AuthContext } from './context/AuthContext';
 import AddStock from './pages/AddStock';
+import CustomerManagementPage from './pages/CustomerManagement'; // Import CustomerManagementPage
 import Dashboard from './pages/Dashboard';
 import EditStock from './pages/EditStock';
 import Login from './pages/Login';
@@ -48,6 +49,9 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="profile" element={<Profile />} />
         
+        {/* Customer Management Route - Accessible by admin and representative */}
+        <Route path="customers" element={<CustomerManagementPage />} />
+
         {/* Admin-only routes */}
         <Route path="stock" element={
           <AdminRoute>

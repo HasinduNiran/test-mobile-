@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { Nav } from 'react-bootstrap';
-import { FaBoxes, FaShoppingCart, FaTachometerAlt, FaUserCircle, FaUsers } from 'react-icons/fa';
+import { FaBoxes, FaShoppingCart, FaTachometerAlt, FaUserCircle, FaUserFriends, FaUsers } from 'react-icons/fa'; // Added FaUserFriends
 import { NavLink } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
@@ -27,7 +27,18 @@ const Sidebar = () => {
             Orders
           </NavLink>
         </Nav.Item>
-          {userInfo?.role === 'admin' && (
+
+        {/* Customer Management Link - Visible to Admin and Representative */}
+        {(userInfo?.role === 'admin' || userInfo?.role === 'representative') && (
+          <Nav.Item>
+            <NavLink to="/customers" className="sidebar-link">
+              <FaUserFriends />
+              Customers
+            </NavLink>
+          </Nav.Item>
+        )}
+        
+        {userInfo?.role === 'admin' && (
           <>
             <Nav.Item>
               <NavLink to="/stock" className="sidebar-link">

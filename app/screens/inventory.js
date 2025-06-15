@@ -2,15 +2,15 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Modal,
-    RefreshControl,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
@@ -111,7 +111,7 @@ export default function InventoryScreen() {
           {item.barcode && (
             <View style={styles.barcodeContainer}>
               <FontAwesome name="barcode" size={14} color="#333" />
-              <ThemedText style={styles.barcodeText}>{item.barcode}</ThemedText>
+              <ThemedText style={styles.barcodeText} selectable={true}>{item.barcode}</ThemedText>
             </View>
           )}
         </View>
@@ -180,7 +180,7 @@ export default function InventoryScreen() {
                   <ThemedText style={styles.modalLabel}>Barcode:</ThemedText>
                   <View style={styles.modalBarcodeValue}>
                     <FontAwesome name="barcode" size={18} color="#333" />
-                    <ThemedText style={styles.modalValue}> {selectedItem.barcode}</ThemedText>
+                    <ThemedText style={styles.modalValue} selectable={true}> {selectedItem.barcode}</ThemedText>
                   </View>
                 </View>
               )}

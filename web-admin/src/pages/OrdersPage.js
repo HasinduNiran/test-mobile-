@@ -4,6 +4,8 @@ import {
     ,
 
 
+
+
     BarElement,
     CategoryScale,
     Chart as ChartJS,
@@ -12,10 +14,12 @@ import {
     Title,
     Tooltip
 } from 'chart.js';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable'; // Changed import
 import { useContext, useEffect, useState } from 'react';
-import { Button, Card, Col, Container, Form, Modal, Row } from 'react-bootstrap';
+import { Alert, Button, Card, Col, Container, Form, Modal, Row, Spinner } from 'react-bootstrap';
 import { Bar, Pie } from 'react-chartjs-2'; // Import Pie for charts
-import { FaCalendarAlt, FaChartPie, FaFilter, FaShoppingCart, FaTags } from 'react-icons/fa';
+import { FaCalendarAlt, FaChartPie, FaFilePdf, FaFilter, FaShoppingCart, FaTags } from 'react-icons/fa';
 import ErrorMessage from '../components/ErrorMessage';
 import Loader from '../components/Loader';
 import { AuthContext } from '../context/AuthContext';
@@ -43,10 +47,48 @@ const OrdersPage = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedNewStatus, setSelectedNewStatus] = useState('');
+  const [statusUpdateLoading, setStatusUpdateLoading] = useState(false); // Added for modal loading
+  const [statusUpdateError, setStatusUpdateError] = useState(''); // Added for modal error
+
+  // PDF Download Functionality
+  const handleDownloadPdf = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["Order ID", "Customer", userInfo?.role === 'admin' ? "Representative" : null, "Items", "Total", "Status", "Time"].filter(Boolean);
+    const tableRows = [];
+
+    orders.forEach(order => {
+      const orderData = [
+        order._id.slice(-6),
+        order.customerName,
+        userInfo?.role === 'admin' ? (order.soldBy?.username || 'N/A') : null,
+        order.items.length,
+        `Rs ${(order.total || 0).toFixed(2)}`,
+        order.status,
+        new Date(order.createdAt).toLocaleTimeString()
+      ].filter(col => col !== null);
+      tableRows.push(orderData);
+    });
+
+    // Use the imported autoTable function directly
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+      didDrawPage: function (data) {
+        // Header
+        doc.setFontSize(20);
+        doc.setTextColor(40);
+        doc.text("Orders Report", data.settings.margin.left, 15);
+      }
+    });
+    doc.save(`orders_report_${selectedDate}_${selectedRepresentative || 'all_reps'}.pdf`);
+  };
+
   // Status update functionality
   const openStatusModal = (order) => {
     setSelectedOrder(order);
     setSelectedNewStatus('');
+    setStatusUpdateError(''); // Clear previous errors
     setShowStatusModal(true);
   };
 
@@ -54,15 +96,17 @@ const OrdersPage = () => {
     setShowStatusModal(false);
     setSelectedOrder(null);
     setSelectedNewStatus('');
+    setStatusUpdateError('');
   };
 
   const handleStatusUpdate = async () => {
     if (!selectedOrder || !selectedNewStatus) return;
 
+    setStatusUpdateLoading(true);
+    setStatusUpdateError('');
     try {
       await axios.patch(`/api/orders/${selectedOrder._id}/status`, { status: selectedNewStatus });
       
-      // Update the local orders state
       setOrders(prevOrders => 
         prevOrders.map(order => 
           order._id === selectedOrder._id ? { ...order, status: selectedNewStatus } : order
@@ -72,7 +116,9 @@ const OrdersPage = () => {
       closeStatusModal();
     } catch (err) {
       console.error('Error updating order status:', err);
-      alert('Failed to update order status. Please try again.');
+      setStatusUpdateError(err.response?.data?.message || 'Failed to update order status. Please try again.');
+    } finally {
+      setStatusUpdateLoading(false);
     }
   };
 
@@ -298,6 +344,11 @@ const OrdersPage = () => {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Orders Management</h2>
         <div className="d-flex align-items-center gap-3">
+          {/* PDF Download Button */}
+          <Button variant="danger" onClick={handleDownloadPdf} disabled={orders.length === 0}>
+            <FaFilePdf className="me-2" /> Download PDF
+          </Button>
+
           {/* Date Filter */}
           <div className="d-flex align-items-center">
             <FaCalendarAlt className="me-2" />
@@ -335,7 +386,10 @@ const OrdersPage = () => {
         <Col>
           <Card>
             <Card.Header>
-              <h5 className="mb-0">Orders for {new Date(selectedDate).toLocaleDateString()}</h5>
+              <div className="d-flex justify-content-between align-items-center">
+                <h5 className="mb-0">Orders for {new Date(selectedDate).toLocaleDateString()}</h5>
+                {/* Optional: Add a specific download button for this table if needed */}
+              </div>
             </Card.Header>
             <Card.Body>
               {orders.length > 0 ? (
@@ -370,7 +424,7 @@ const OrdersPage = () => {
                           <th>Customer</th>
                           {userInfo?.role === 'admin' && <th>Representative</th>}
                           <th>Items</th>
-                          <th>Total</th>
+                          <th>Total (Rs)</th> {/* Changed from $ to Rs */}
                           <th>Status</th>
                           <th>Actions</th>
                           <th>Time</th>
@@ -383,7 +437,7 @@ const OrdersPage = () => {
                             <td>{order.customerName}</td>
                             {userInfo?.role === 'admin' && <td>{order.soldBy?.username || 'N/A'}</td>}
                             <td>{order.items.length}</td>
-                            <td>${(order.total || 0).toFixed(2)}</td>
+                            <td>Rs {(order.total || 0).toFixed(2)}</td> {/* Changed from $ to Rs */}
                             <td>
                               <span className={`badge bg-${getStatusBadgeColor(order.status)}`}>
                                 {order.status}
@@ -460,7 +514,7 @@ const OrdersPage = () => {
                     <tr>
                       <th>Product Name</th>
                       <th>Total Quantity Sold</th>
-                      <th>Total Value Sold</th>
+                      <th>Total Value Sold (Rs)</th> {/* Changed from $ to Rs */}
                     </tr>
                   </thead>
                   <tbody>
@@ -468,7 +522,7 @@ const OrdersPage = () => {
                       <tr key={item.productId}>
                         <td>{item.productName}</td>
                         <td>{item.totalQuantitySold}</td>
-                        <td>${(item.totalValueSold || 0).toFixed(2)}</td>
+                        <td>Rs {(item.totalValueSold || 0).toFixed(2)}</td> {/* Changed from $ to Rs */}
                       </tr>
                     )) : (
                       <tr>
@@ -492,10 +546,10 @@ const OrdersPage = () => {
         <Modal.Body>
           {selectedOrder && (
             <>
-              <p><strong>Order ID:</strong> {selectedOrder._id}</p>
+              <p><strong>Order ID:</strong> {selectedOrder._id.slice(-8).toUpperCase()}</p>
               <p><strong>Customer:</strong> {selectedOrder.customerName}</p>
               <p><strong>Current Status:</strong> <span className={`badge bg-${getStatusBadgeColor(selectedOrder.status)}`}>{selectedOrder.status}</span></p>
-              <p><strong>Total:</strong> ${(selectedOrder?.total || 0).toFixed(2)}</p>
+              <p><strong>Total:</strong> Rs {(selectedOrder?.total || 0).toFixed(2)}</p>
               
               <Form.Group className="mt-3">
                 <Form.Label>Select New Status:</Form.Label>
@@ -503,6 +557,7 @@ const OrdersPage = () => {
                   value={selectedNewStatus} 
                   onChange={(e) => setSelectedNewStatus(e.target.value)}
                   required
+                  disabled={statusUpdateLoading} // Disable while loading
                 >
                   <option value="">-- Select Status --</option>
                   {getAvailableStatuses(selectedOrder.status, userInfo?.role === 'admin').map(status => (
@@ -513,31 +568,36 @@ const OrdersPage = () => {
 
               {selectedNewStatus && (
                 <div className="mt-3 p-3 bg-light rounded">
-                  <p className="mb-1"><strong>Status Change:</strong></p>
+                  <p className="mb-1"><strong>Status Change Preview:</strong></p>
                   <p className="mb-0">
                     <span className={`badge bg-${getStatusBadgeColor(selectedOrder.status)} me-2`}>
                       {selectedOrder.status}
                     </span>
-                    →
-                    <span className={`badge bg-${getStatusBadgeColor(selectedNewStatus)} ms-2`}>
+                    <strong className="mx-1">→</strong>
+                    <span className={`badge bg-${getStatusBadgeColor(selectedNewStatus)} ms-1`}>
                       {selectedNewStatus}
                     </span>
                   </p>
                 </div>
               )}
+              {statusUpdateError && (
+                <Alert variant="danger" className="mt-3">
+                  {statusUpdateError}
+                </Alert>
+              )}
             </>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={closeStatusModal}>
+          <Button variant="secondary" onClick={closeStatusModal} disabled={statusUpdateLoading}>
             Cancel
           </Button>
           <Button 
             variant="primary" 
             onClick={handleStatusUpdate}
-            disabled={!selectedNewStatus}
+            disabled={!selectedNewStatus || statusUpdateLoading}
           >
-            Update Status
+            {statusUpdateLoading ? <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> Updating...</> : 'Update Status'}
           </Button>
         </Modal.Footer>
       </Modal>

@@ -59,4 +59,17 @@ const auth = async (req, res, next) => {
   }
 };
 
-module.exports = { protect, admin, auth };
+// Middleware to authorize based on roles
+const authorize = (roles) => {
+  return (req, res, next) => {
+    if (!req.user || !req.user.role) {
+      return res.status(401).json({ message: 'Not authorized, user role not found' });
+    }
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'User role not authorized for this route' });
+    }
+    next();
+  };
+};
+
+module.exports = { protect, admin, auth, authorize };
