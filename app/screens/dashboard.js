@@ -148,15 +148,15 @@ export default function DashboardScreen() {
         <ThemedText style={styles.stockItemCategory} numberOfLines={1}>
           {item.category}
         </ThemedText>
-        <View style={styles.stockItemFooter}>
-          <ThemedText style={styles.stockItemPrice}>${item.price.toFixed(2)}</ThemedText>
+        <View style={styles.stockItemFooter}> 
           <View style={styles.stockQuantityContainer}>
             <ThemedText style={[
               styles.stockQuantity,
-              item.quantity < 10 ? styles.lowQuantity : null
+              item.quantity < 10 ? styles.lowQuantity : styles.highQuantity
             ]}>{item.quantity}</ThemedText>
             <ThemedText style={styles.inStockText}>in stock</ThemedText>
           </View>
+          <ThemedText style={styles.stockItemPrice}>Rs. {item.price.toFixed(2)}</ThemedText>
         </View>
       </View>
     </TouchableOpacity>
@@ -200,12 +200,13 @@ export default function DashboardScreen() {
         {salesData.map((item, index) => (
           <View key={index} style={styles.salesCard}>
             <View style={styles.salesIconContainer}>
-              <FontAwesome name="dollar" size={18} color="#4CAF50" />
+              {/* Using a generic icon like 'money' or 'credit-card' might be more appropriate than 'dollar' if currency is dynamic */}
+              <FontAwesome name="money" size={18} color="#4CAF50" /> 
             </View>
             <View style={styles.salesContent}>
               <ThemedText style={styles.salesLabel}>{item.label}</ThemedText>
               <ThemedText style={styles.salesValue}>
-                ${item.value.toFixed(2)}
+                Rs. {item.value.toFixed(2)}
               </ThemedText>
               <ThemedText style={styles.salesSubtext}>{item.subtext}</ThemedText>
             </View>
@@ -356,6 +357,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f0f2f5', // Light background for loading
   },
   loadingText: {
     marginTop: 10,
@@ -633,92 +635,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stockItemName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 15, // Slightly larger for better readability
+    fontWeight: '600', // Bolder
+    color: '#333', // Darker color
+    marginBottom: 3, // Spacing
   },
   stockItemCategory: {
     fontSize: 12,
-    color: '#757575',
-    marginBottom: 8,
+    color: '#666', // Slightly lighter than name
+    marginBottom: 6, // Spacing
   },
   stockItemFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
+    // Removed flexDirection: 'row' and justifyContent: 'space-between'
+    // alignItems: 'center', // Can be removed or set to 'flex-start'
+    marginTop: 'auto', // Push to bottom
+    alignItems: 'flex-start', // Align items to the start of the flex container
   },
   stockItemPrice: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2E7D32',
+    marginTop: 5, // Add some margin to separate from quantity line
   },
   stockQuantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 3, // Padding
+    paddingHorizontal: 8, // Padding
+    borderRadius: 12, // Rounded corners
+    backgroundColor: '#f0f0f0', // Light background for the container
   },
   stockQuantity: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    marginRight: 4,
+    fontSize: 14, // Clear quantity
+    fontWeight: '600', // Bolder
+    marginRight: 4, // Space before "in stock"
   },
   lowQuantity: {
-    color: '#d32f2f',
-    fontWeight: 'bold',
+    color: '#D32F2F', // Red for low stock
+  },
+  highQuantity: {
+    color: '#388E3C', // Green for sufficient stock
   },
   inStockText: {
-    fontSize: 12,
-    color: '#9e9e9e',
+    fontSize: 11, // Smaller text
+    color: '#555', // Neutral color
+    fontStyle: 'italic',
   },
-  salesSection: {
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  salesSummaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  salesCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  salesIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  salesContent: {
-    flex: 1,
-  },
-  salesLabel: {
-    fontSize: 12,
-    color: '#757575',
-  },
-  salesValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 2,
-  },
-  salesSubtext: {
-    fontSize: 11,
-    color: '#9e9e9e',
-    marginTop: 2,
-  },
+  // ... Rest of the styles
 });
