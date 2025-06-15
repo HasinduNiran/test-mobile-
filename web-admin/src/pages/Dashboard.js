@@ -44,7 +44,7 @@ const Dashboard = () => {
         setError('');
 
         // Fetch all stock items
-        const stockResponse = await axios.get('http://16.171.225.212/api2/api/stock');
+        const stockResponse = await axios.get('/api/stock');
         const stockItems = stockResponse.data;
         
         const totalValue = stockItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);

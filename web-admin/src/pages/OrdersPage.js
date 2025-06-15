@@ -7,6 +7,7 @@ import {
 
 
 
+
   BarElement,
   CategoryScale,
   Chart as ChartJS,
@@ -106,7 +107,7 @@ const OrdersPage = () => {
     setStatusUpdateLoading(true);
     setStatusUpdateError('');
     try {
-      await axios.patch(`http://16.171.225.212/api2/api/orders/${selectedOrder._id}/status`, { status: selectedNewStatus });
+      await axios.patch(`/api/orders/${selectedOrder._id}/status`, { status: selectedNewStatus });
       
       setOrders(prevOrders => 
         prevOrders.map(order => 

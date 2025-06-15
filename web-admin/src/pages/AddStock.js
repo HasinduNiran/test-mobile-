@@ -42,7 +42,7 @@ const AddStock = () => {
     
     try {
       setLoading(true);
-        await axios.post('http://16.171.225.212/api2/api/stock', {
+        await axios.post('/api/stock', {
         name,
         barcode,
         description,

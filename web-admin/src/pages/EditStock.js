@@ -26,7 +26,7 @@ const EditStock = () => {
     const fetchStockItem = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`http://16.171.225.212/api2/api/stock/${id}`);        const item = response.data;
+        const response = await axios.get(`/api/stock/${id}`);        const item = response.data;
         
         setName(item.name || '');
         setBarcode(item.barcode || '');
@@ -68,7 +68,7 @@ const EditStock = () => {
     
     try {
       setLoading(true);
-        await axios.put(`http://16.171.225.212/api2/api/stock/${id}`, {
+        await axios.put(`/api/stock/${id}`, {
         name,
         barcode,
         description,

@@ -37,7 +37,7 @@ const Profile = () => {
     try {
       setLoading(true);
       
-      const response = await axios.put('http://16.171.225.212/api2/api/profile/update-username', { username });
+      const response = await axios.put('/api/profile/update-username', { username });
       
       updateUser({ username: response.data.user.username });
       toast.success('Profile updated successfully');
@@ -72,7 +72,7 @@ const Profile = () => {
     try {
       setLoading(true);
       
-      await axios.put('http://16.171.225.212/api2/api/profile/update-password', {
+      await axios.put('/api/profile/update-password', {
         currentPassword,
         newPassword
       });
