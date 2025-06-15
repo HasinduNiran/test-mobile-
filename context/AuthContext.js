@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Network Error: Server is unreachable. Please check your internet connection or try again later.');
       }
       
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
+      const response = await axios.post('http://16.171.225.212/api2/api/auth/register', {
         username,
         email,
         password
@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Network Error: Server is unreachable. Please check your internet connection or try again later.');
       }
       
-      const response = await axios.post(`${API_URL}/api/auth/login`, {
+      const response = await axios.post('http://16.171.225.212/api2/api/auth/login', {
         email,
         password
       });

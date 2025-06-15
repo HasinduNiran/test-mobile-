@@ -29,7 +29,7 @@ const CustomerManagementPage = () => {
     try {
       setLoading(true);
       setError('');
-      const { data } = await axios.get('/api/customers');
+      const { data } = await axios.get('http://16.171.225.212/api2/api/customers');
       setCustomers(data);
     } catch (err) {
       console.error('Error fetching customers:', err);
@@ -96,9 +96,9 @@ const CustomerManagementPage = () => {
 
     try {
       if (isEditing && currentCustomer) {
-        await axios.put(`/api/customers/${currentCustomer._id}`, payload);
+        await axios.put(`http://16.171.225.212/api2/api/customers/${currentCustomer._id}`, payload);
       } else {
-        await axios.post('/api/customers', payload);
+        await axios.post('http://16.171.225.212/api2/api/customers', payload);
       }
       fetchCustomers(); // Refresh list
       handleCloseModal();
@@ -114,7 +114,7 @@ const CustomerManagementPage = () => {
     if (window.confirm('Are you sure you want to delete this customer?')) {
       try {
         setLoading(true); // Use main loading for delete action
-        await axios.delete(`/api/customers/${customerId}`);
+        await axios.delete(`http://16.171.225.212/api2/api/customers/${customerId}`);
         fetchCustomers();
       } catch (err) {
         console.error('Error deleting customer:', err);

@@ -1,12 +1,12 @@
 import axios from 'axios';
 import {
-    BarElement,
-    CategoryScale,
-    Chart as ChartJS,
-    Legend,
-    LinearScale,
-    Title,
-    Tooltip
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  Title,
+  Tooltip
 } from 'chart.js';
 import { useContext, useEffect, useState } from 'react';
 import { Card, Col, Container, Row } from 'react-bootstrap';
@@ -44,7 +44,7 @@ const Dashboard = () => {
         setError('');
 
         // Fetch all stock items
-        const stockResponse = await axios.get('/api/stock');
+        const stockResponse = await axios.get('http://16.171.225.212/api2/api/stock');
         const stockItems = stockResponse.data;
         
         const totalValue = stockItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);

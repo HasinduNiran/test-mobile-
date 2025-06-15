@@ -31,7 +31,7 @@ if (Platform.OS === 'android') {
 }
 
 const apiClient = axios.create({
-  baseURL: `${API_URL}/api`,
+  baseURL: 'http://16.171.225.212/api2/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -61,7 +61,7 @@ export const checkServerConnection = async () => {
     
     for (const endpoint of endpoints) {
       try {
-        const response = await axios.get(`${API_URL}${endpoint}`, { 
+        const response = await axios.get(`http://16.171.225.212/api2/api${endpoint}`, { 
           timeout: 5000,
           validateStatus: function (status) {
             return status >= 200 && status < 600; // Consider any response a success

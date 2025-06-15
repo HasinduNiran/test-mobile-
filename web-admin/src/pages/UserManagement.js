@@ -29,7 +29,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/auth/users');
+      const response = await axios.get('http://16.171.225.212/api2/api/auth/users');
       setUsers(response.data);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -97,11 +97,11 @@ const UserManagement = () => {
           updateData.password = formData.password;
         }
 
-        await axios.put(`/api/auth/users/${editingUser._id}`, updateData);
+        await axios.put(`http://16.171.225.212/api2/api/auth/users/${editingUser._id}`, updateData);
         setShowAlert({ show: true, message: 'User updated successfully!', type: 'success' });
       } else {
         // Create new user
-        await axios.post('/api/auth/users', formData);
+        await axios.post('http://16.171.225.212/api2/api/auth/users', formData);
         setShowAlert({ show: true, message: 'User created successfully!', type: 'success' });
       }
       
@@ -122,7 +122,7 @@ const UserManagement = () => {
   const handleDelete = async (userId, username) => {
     if (window.confirm(`Are you sure you want to delete user "${username}"?`)) {
       try {
-        await axios.delete(`/api/auth/users/${userId}`);
+        await axios.delete(`http://16.171.225.212/api2/api/auth/users/${userId}`);
         setShowAlert({ show: true, message: 'User deleted successfully!', type: 'success' });
         fetchUsers();
       } catch (err) {

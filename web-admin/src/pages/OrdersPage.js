@@ -1,18 +1,19 @@
 import axios from 'axios';
 import {
-    ArcElement // Needed for Pie/Doughnut charts
-    ,
+  ArcElement // Needed for Pie/Doughnut charts
+  ,
 
 
 
 
-    BarElement,
-    CategoryScale,
-    Chart as ChartJS,
-    Legend,
-    LinearScale,
-    Title,
-    Tooltip
+
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  Title,
+  Tooltip
 } from 'chart.js';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; // Changed import
@@ -105,7 +106,7 @@ const OrdersPage = () => {
     setStatusUpdateLoading(true);
     setStatusUpdateError('');
     try {
-      await axios.patch(`/api/orders/${selectedOrder._id}/status`, { status: selectedNewStatus });
+      await axios.patch(`http://16.171.225.212/api2/api/orders/${selectedOrder._id}/status`, { status: selectedNewStatus });
       
       setOrders(prevOrders => 
         prevOrders.map(order => 

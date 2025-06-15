@@ -46,6 +46,6 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "proxy": "http://16.171.225.212/api2"
+  }
 }
+

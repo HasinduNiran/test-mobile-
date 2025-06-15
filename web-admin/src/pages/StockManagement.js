@@ -22,7 +22,7 @@ const StockManagement = () => {
   const fetchStockItems = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/stock');
+      const response = await axios.get('http://16.171.225.212/api2/api/stock');
       setStockItems(response.data);
       setFilteredItems(response.data);
       
@@ -73,7 +73,7 @@ const StockManagement = () => {
     if (!itemToDelete) return;
     
     try {
-      await axios.delete(`/api/stock/${itemToDelete._id}`);
+      await axios.delete(`http://16.171.225.212/api2/api/stock/${itemToDelete._id}`);
       setShowDeleteModal(false);
       setItemToDelete(null);
       toast.success('Stock item deleted successfully');
