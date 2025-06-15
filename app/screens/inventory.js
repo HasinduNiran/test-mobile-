@@ -97,7 +97,7 @@ export default function InventoryScreen() {
           <ThemedText style={styles.itemName}>{item.name}</ThemedText>
           <ThemedText style={styles.itemCategory}>{item.category}</ThemedText>
           <View style={styles.itemMetaRow}>
-            <ThemedText style={styles.itemPrice}>${item.price.toFixed(2)}</ThemedText>
+            <ThemedText style={styles.itemPrice}>Rs.{item.price.toFixed(2)}</ThemedText>
             <View style={styles.quantityContainer}>
               <ThemedText style={[
                 styles.itemQuantity, 
