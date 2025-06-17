@@ -5,10 +5,12 @@ import { toast } from 'react-toastify';
 
 export const AuthContext = createContext();
 
-const API_URL = 'http://16.171.225.212/api2';
+const API_URL = 'http://localhost:5000';
 
 // Configure global axios defaults
 axios.defaults.timeout = 15000; // 15 seconds
+axios.defaults.baseURL = API_URL; // Set the base URL for all axios requests
+
 axios.interceptors.response.use(
   response => response,
   error => {

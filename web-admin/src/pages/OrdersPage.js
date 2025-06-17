@@ -8,6 +8,10 @@ import {
 
 
 
+
+
+
+
   BarElement,
   CategoryScale,
   Chart as ChartJS,
@@ -21,10 +25,19 @@ import autoTable from 'jspdf-autotable'; // Changed import
 import { useContext, useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Container, Form, Modal, Row, Spinner } from 'react-bootstrap';
 import { Bar, Pie } from 'react-chartjs-2'; // Import Pie for charts
-import { FaCalendarAlt, FaChartPie, FaFilePdf, FaFilter, FaShoppingCart, FaTags } from 'react-icons/fa';
+import { FaCalendarAlt, FaChartPie, FaEye, FaFilePdf, FaFilter, FaShoppingCart, FaTags } from 'react-icons/fa';
 import ErrorMessage from '../components/ErrorMessage';
 import Loader from '../components/Loader';
 import { AuthContext } from '../context/AuthContext';
+
+// Company info for receipt - same as in POS
+const COMPANY_INFO = {
+  name: "Agency Mobile Shop",
+  address: "123 Main Street, City, Country",
+  phone: "+123 456 7890",
+  email: "info@agencymobilestore.com",
+  website: "www.agencymobilestore.com"
+};
 
 ChartJS.register(
   CategoryScale,
@@ -45,12 +58,54 @@ const OrdersPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
+  // Receipt modal state
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  
   // Status update modal state
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedNewStatus, setSelectedNewStatus] = useState('');
   const [statusUpdateLoading, setStatusUpdateLoading] = useState(false); // Added for modal loading
   const [statusUpdateError, setStatusUpdateError] = useState(''); // Added for modal error
+
+  // Receipt modal handlers
+  const openReceiptModal = async (orderId) => {
+    try {
+      const response = await axios.get(`/api/orders/${orderId}`);
+      const orderData = response.data;
+      
+      // Format receipt data similarly to POS structure
+      const receiptData = {
+        orderId: orderData._id,
+        date: new Date(orderData.createdAt).toLocaleString(),
+        items: orderData.items.map(item => ({
+          name: item.productName,
+          price: item.price,
+          quantity: item.quantity,
+          subtotal: item.subtotal,
+          ...(item.discountPercent && { discountPercent: item.discountPercent })
+        })),
+        subtotal: orderData.subtotal,
+        tax: orderData.tax || 0,
+        total: orderData.total,
+        soldBy: orderData.soldBy?.username || 'Unknown',
+        customerName: orderData.customerName,
+        paymentMethod: orderData.paymentMethod || 'Cash'
+      };
+      
+      setSelectedReceipt(receiptData);
+      setShowReceiptModal(true);
+    } catch (err) {
+      console.error('Error fetching order details:', err);
+      alert('Failed to load receipt details');
+    }
+  };
+  
+  const closeReceiptModal = () => {
+    setShowReceiptModal(false);
+    setSelectedReceipt(null);
+  };
 
   // PDF Download Functionality
   const handleDownloadPdf = () => {
@@ -334,6 +389,112 @@ const OrdersPage = () => {
     }]
   };
 
+  // Receipt component
+  const renderReceiptModal = () => {
+    if (!selectedReceipt) return null;
+    
+    return (
+      <Modal show={showReceiptModal} onHide={closeReceiptModal} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Order Receipt</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="receipt-container p-3">
+            {/* Receipt Header */}
+            <div className="text-center mb-4">
+              <h3 className="mb-1">{COMPANY_INFO.name}</h3>
+              <p className="mb-1 small">{COMPANY_INFO.address}</p>
+              <p className="mb-1 small">{COMPANY_INFO.phone} | {COMPANY_INFO.email}</p>
+              <hr className="my-2" />
+            </div>
+            
+            {/* Order Info */}
+            <div className="row mb-3">
+              <div className="col-4">
+                <p className="mb-1"><strong>Receipt #:</strong> {selectedReceipt.orderId.slice(-8)}</p>
+              </div>
+              <div className="col-4">
+                <p className="mb-1"><strong>Date:</strong> {selectedReceipt.date}</p>
+              </div>
+              <div className="col-4">
+                <p className="mb-1"><strong>Cashier:</strong> {selectedReceipt.soldBy}</p>
+              </div>
+            </div>
+            <hr className="my-2" />
+            
+            {/* Items Table */}
+            <div className="table-responsive">
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    <th style={{ width: '50%' }}>Item</th>
+                    <th className="text-right">Qty</th>
+                    <th className="text-right">Price</th>
+                    <th className="text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedReceipt.items.map((item, idx) => (
+                    <tr key={idx}>
+                      <td>
+                        {item.name}
+                        {item.discountPercent > 0 && (
+                          <span className="text-danger small ms-2">({item.discountPercent}% off)</span>
+                        )}
+                      </td>
+                      <td className="text-right">{item.quantity}</td>
+                      <td className="text-right">Rs {item.price.toFixed(2)}</td>
+                      <td className="text-right">Rs {item.subtotal.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Totals */}
+            <div className="row justify-content-end mt-3">
+              <div className="col-md-5">
+                <table className="table table-sm">
+                  <tbody>
+                    <tr>
+                      <th>Subtotal:</th>
+                      <td className="text-right">Rs {selectedReceipt.subtotal.toFixed(2)}</td>
+                    </tr>
+                    {selectedReceipt.tax > 0 && (
+                      <tr>
+                        <th>Tax:</th>
+                        <td className="text-right">Rs {selectedReceipt.tax.toFixed(2)}</td>
+                      </tr>
+                    )}
+                    <tr className="font-weight-bold">
+                      <th>TOTAL:</th>
+                      <td className="text-right">Rs {selectedReceipt.total.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="text-center mt-4">
+              <p className="mb-1">Thank you for shopping with us!</p>
+              <p className="small">Visit us at {COMPANY_INFO.website}</p>
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeReceiptModal}>Close</Button>
+          <Button variant="primary" onClick={() => {
+            // Print functionality
+            window.print();
+          }}>
+            Print Receipt
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    );
+  };
+
   if (loading) {
     return <Loader />;
   }
@@ -405,7 +566,7 @@ const OrdersPage = () => {
                     </div>
                     <div className="col-md-4">
                       <div className="text-center p-3 bg-light rounded">                        <h4 className="text-success">
-                          ${orders.reduce((sum, order) => sum + (order.total || 0), 0).toFixed(2)}
+                          Rs {orders.reduce((sum, order) => sum + (order.total || 0), 0).toFixed(2)}
                         </h4>
                         <small className="text-muted">Total Sales</small>
                       </div>
@@ -430,6 +591,7 @@ const OrdersPage = () => {
                           <th>Status</th>
                           <th>Actions</th>
                           <th>Time</th>
+                          <th>Receipt</th> {/* New Column for Receipt Icon */}
                         </tr>
                       </thead>
                       <tbody>
@@ -463,6 +625,16 @@ const OrdersPage = () => {
                               )}
                             </td>
                             <td>{new Date(order.createdAt).toLocaleTimeString()}</td>
+                            <td> {/* New Cell for Receipt Icon */}
+                              <Button 
+                                variant="outline-info" 
+                                size="sm" 
+                                className="btn-icon" 
+                                onClick={() => openReceiptModal(order._id)}
+                              >
+                                <FaEye />
+                              </Button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -603,6 +775,35 @@ const OrdersPage = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Receipt Modal */}
+      {renderReceiptModal()}
+
+      {/* Add print styles for receipt */}
+      <style type="text/css">
+        {`
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .receipt-container, .receipt-container * {
+              visibility: visible;
+            }
+            .receipt-container {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+            }
+            .modal-footer, .modal-header {
+              display: none !important;
+            }
+          }
+          .text-right {
+            text-align: right;
+          }
+        `}
+      </style>
     </Container>
   );
 };
